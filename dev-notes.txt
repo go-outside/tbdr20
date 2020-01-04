@@ -1,0 +1,8 @@
+
+
+
+Does this open the turn order window?
+
+            Campaign().set({
+                initiativepage: pageid
+            });
