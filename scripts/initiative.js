@@ -6,7 +6,7 @@ var tbdInitiative = tbdInitiative || ( function()
   'use strict';
   
   const Roll20 = {};
-  Roll20.AbilityScore = {
+  Roll20.AbilityScores = {
     CHARISMA : 'charisma',
     CONSTITUTION : 'constitution',
     DEXTERITY : 'dexterity',
@@ -79,8 +79,8 @@ var tbdInitiative = tbdInitiative || ( function()
   {
     const takeTen = 10;
     // Presume that getAttrByName may return undefined
-    var dexterity = getAttrByName( characterId, Roll20.AbilityScore.DEXTERITY );
-    return takeTen + dexterity === undefined ? 0 : abilityScoreModifier( Number( dexterity ) );
+    var dexterity = getAttrByName( characterId, Roll20.AbilityScores.DEXTERITY );
+    return takeTen + ( dexterity === undefined ? 0 : abilityScoreModifier( Number( dexterity ) ) );
   };
 
   // Pass an array of selectObjects presumably from a message.selected
@@ -102,7 +102,6 @@ var tbdInitiative = tbdInitiative || ( function()
           participants.push( { id: rollObject.id, pr: characterInitiative( maybeCharacter.id ) } );
         }
       } );
-    log( participants );
     return participants;
   };
 
@@ -153,6 +152,7 @@ var tbdInitiative = tbdInitiative || ( function()
 
   var registerEventHandlers = function()
   {
+    clearTurnOrder();
     on( 'chat:message', handleChatMessage );
 	};
 
@@ -165,4 +165,4 @@ var tbdInitiative = tbdInitiative || ( function()
     registerEventHandlers: registerEventHandlers };
 }() );
 
-on( "ready", function() { state.tbdInitiative = undefined; tbdInitiative.registerEventHandlers(); } );
+on( "ready", function() { tbdInitiative.registerEventHandlers(); } );
