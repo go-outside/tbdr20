@@ -1,8 +1,235 @@
 
-
+on 'end-combat' add combat time to calendar? or update calendar to have combat round precision
+probably need per round precision in calendar for case of effects with duration extending beyound the combat
+maybe time is rounded up to nearest minute when combat ends
 
 Does this open the turn order window?
 
             Campaign().set({
                 initiativepage: pageid
             });
+
+
+
+You have access to the Underscore.js library (via the _ global object) to help make things easier. 
+Underscore provides helper functions for things like _.each (to iterate through an array of objects).
+
+_.each( list, function ... ) appears to work like list.forEach( function ... )
+
+New JavaScript syntax seems to obviate the use of underscore
+
+What does chat command /direct do?
+
+tap_.tap(object, interceptor)
+Invokes interceptor with the object, and then returns object. The primary purpose of this method is to "tap into" a method chain, in order to perform operations on intermediate results within the chain.
+
+_.chain([1,2,3,200])
+  .filter(function(num) { return num % 2 == 0; })
+  .tap(alert)
+  .map(function(num) { return num * num })
+  .value();
+=> // [2, 200] (alerted)
+=> [4, 40000]
+
+
+                    state.GroupInitiative = {
+                        version: schemaVersion,
+                        bonusStatGroups: [
+                            [
+                                {
+                                    attribute: 'dexterity'
+                                }
+                            ]
+                        ],
+                        savedTurnOrders: {
+                        },
+                        config: {
+                            rollType: 'Individual-Roll',
+                            replaceRoll: false,
+                            dieSize: 20,
+                            diceCount: 1,
+                            maxDecimal: 2,
+                            diceCountAttribute: '',
+                            autoOpenInit: true,
+                            sortOption: 'Descending',
+                            announcer: 'Partial'
+                        }
+                    };
+
+JSON.parse(
+JSON.stringify
+
+getAttrByName is roll20 api function
+
+"dexterity" 
+  yields 14 for Drazal Vibbin
+    npcd_dex 14
+    npcd_dex_mod (+2)
+  yields 0 for Skeletons in existing map
+  yields 14 for Skeletons dragged from journal onto map
+
+
+    findInitiativeBonus = function(charObj,/*eslint-disable no-unused-vars*/token/*eslint-enable no-unused-vars*/) {
+        var bonus = '';
+        if(_.has(bonusCache,charObj.id)) {
+            return bonusCache[charObj.id];
+        }
+        _.find(state.GroupInitiative.bonusStatGroups, function(group){
+            bonus = _.chain(group)
+                .map(function(details){
+                    
+                    var stat=getAttrByName(charObj.id,details.attribute, details.type||'current');
+                    if( ! _.isUndefined(stat) && !_.isNull(stat) && 
+                        _.isNumber(stat) || (_.isString(stat) && stat.length)
+                    ) {
+                        stat = parseEmbeddedStatReferences(stat,charObj);
+                        stat = _.reduce(details.adjustments || [],function(memo,a){
+                            var args,adjustment,func;
+                            if(memo) {
+                                args=a.split(':');
+                                adjustment=args.shift().toLowerCase();
+                                args.unshift(memo);
+                                func=statAdjustments[adjustment].func;
+                                if(_.isFunction(func)) {
+                                    memo =func.apply({},args);
+                                }
+                            }
+                            return memo;
+                        },stat);
+                        return stat;
+                    }
+                    return undefined;
+                })
+                .value();
+
+            if(_.contains(bonus,undefined) || _.contains(bonus,null) || _.contains(bonus,NaN)) {
+                bonus='';
+                return false;
+            }
+            bonus = bonus.join('+');
+            return true;
+        });
+        bonusCache[charObj.id]=bonus;
+        return bonus;
+    },
+
+
+
+    parseEmbeddedStatReferences = function(stat,charObj){
+        let charName=charObj.get('name'),
+            stext=(stat+'').replace(/@{[^}]*}/g,(s)=>{
+                let parts=_.rest(s.match(/@{([^|}]*)\|?([^|}]*)\|?([^|}]*)}/)),
+                    statName,modName;
+                if(parts[2].length){
+                    statName=parts[1];
+                    modName=parts[2];
+                } else if(parts[1].length){
+                    if(_.contains(['max','current'],parts[1])){
+                        statName=parts[0];
+                        modName=parts[1];
+                    } else {
+                        statName=parts[1];
+                    }
+                } else {
+                    statName=parts[0];
+                }
+                
+                return `@{${charName}|${statName}${modName?`|${modName}`:''}}`;
+            })
+            .replace(/&{tracker}/,'');
+        return stext;
+    },
+
+
+turnorder = Campaign().get('turnorder');
+turnorder = ('' === turnorder) ? [] : JSON.parse(turnorder);
+
+message.selected is an array of objects the user had selected when the command was entered
+message.type == 'api
+
+associate selected tokens with characters:
+
+Roll20.Objects = {
+  CAMPAIGN : 'campaign',
+  CHARACTER : 'character',
+  GRAPHIC : 'graphic',
+  MACRO : 'macro',
+  PATH : 'path',
+  PLAYER : 'player',
+  TEXT : 'text',
+  TOKEN : 'token '
+};
+
+Roll20.Verbs = {
+  REPRESENTS : 'represents'
+};
+
+Roll20.Messages = {
+  API : 'api'
+};
+
+participants = [];
+message.selected.forEach(
+  function( rollObject )
+  {
+    const maybeCharacter = getObject( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+    if ( maybeCharacter !== undefined ) {
+      participants.push( { token: rollObject, character: maybeCharacter, initiative: 0 } )
+    }
+  } );
+
+var stat=getAttrByName(charObj.id,details.attribute, details.type||'current');
+
+                        rollSetup = _.chain(msg.selected)
+                            .map(function(s){
+                                return getObj(s._type,s._id);
+                            })
+                            .reject(_.isUndefined)
+                            .reject(function(s){
+                                return _.contains(_.pluck(turnorder,'id'),s.id);
+                            })
+                            .map(function(s){
+                                pageid=pageid || s.get('pageid');
+                                return {
+                                    token: s,
+                                    character: getObj('character',s.get('represents'))
+                                };
+                            })
+                            .map(function(s){
+                                s.roll=[];
+                                if(s.character) {
+                                    let bonus=findInitiativeBonus(s.character,s.token);
+                                    bonus = (_.isString(bonus) ? (bonus.trim().length ? bonus : '0') : bonus);
+                                    s.roll.push( bonus );
+                                }
+                                if(manualBonus) {
+                                    s.roll.push( manualBonus );
+                                }
+                                s.roll.push( initFunc(s) );
+                                return s;
+                            })
+                            .value();
+
+                        initRolls = _.map(rollSetup,function(rs,i){
+                                return {
+                                    index: i,
+                                    roll: ('[[('+ _.reject(rs.roll,function(r){
+                                                return _.isString(r) && _.isEmpty(r);
+                                            })
+                                            .join(') + (')+')]]')
+                                            .replace(/\[\[\[/g, "[[ [")
+                                };
+                            });
+
+
+message.selected is array of selected objects
+message.selected._type == 'graphic'
+getObj( message.selected._type, message.selected._id )
+
+
+
+
+The full list of status markers that are available (in the same order they appear in the marker tray):
+
+"red", "blue", "green", "brown", "purple", "pink", "yellow", "dead", "skull", "sleepy", "half-heart", "half-haze", "interdiction", "snail", "lightning-helix", "spanner", "chained-heart", "chemical-bolt", "death-zone", "drink-me", "edge-crack", "ninja-mask", "stopwatch", "fishing-net", "overdrive", "strong", "fist", "padlock", "three-leaves", "fluffy-wing", "pummeled", "tread", "arrowed", "aura", "back-pain", "black-flag", "bleeding-eye", "bolt-shield", "broken-heart", "cobweb", "broken-shield", "flying-flag", "radioactive", "trophy", "broken-skull", "frozen-orb", "rolling-bomb", "white-tower", "grab", "screaming", "grenade", "sentry-gun", "all-for-one", "angel-outfit", "archery-target"
+
