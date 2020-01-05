@@ -83,7 +83,7 @@ var tbdCombat = tbdCombat || ( function()
   // Modifies sequence of participants
   var cycleTurnOrder = function( participants )
   {
-    if ( participants.length <= 1 ) {
+    if ( participants.length < 1 ) {
       return true;
     }
     // Store the token object id for participants completing a turn
@@ -95,8 +95,6 @@ var tbdCombat = tbdCombat || ( function()
   // Check to see if the top entry is in tbdCombat.completedTurns
   var roundComplete = function( participants )
   {
-    log( participants );
-    log( tbdCombat.completedTurns );
     return participants.length == 0 || tbdCombat.completedTurns.includes( participants[ 0 ].id );
   };
 
