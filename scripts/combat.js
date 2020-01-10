@@ -154,15 +154,48 @@ var tbdCombat = tbdCombat || ( function()
   {
     return Math.floor( ( score - 10 ) / 2 );
   };
-  
+
+  var sendConditionContractedMessage = function( name, condition )
+  {
+    return sendChat( '', '/desc ' + name + condition.contract );
+  };
+
+  var sendConditionRecoveredMessage = function( name, condition )
+  {
+    return sendChat( '', '/desc ' + name + condition.recover );
+  };
+
+  // Remove status marker from graphic
+  // Send recover message
+  var purgeConditionRecord = function( record )
+  {
+    const rollObject = getObj( Roll20.Objects.GRAPHIC, record.graphicId );
+    // Check to see that roll object is still defined -- it may have been removed
+    if ( rollObject != undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+      const condition = findCondition( record.conditionName );
+      if ( condition !== undefined ) {
+        // Remove the graphical status marker
+        rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
+        if ( maybeCharacter !== undefined ) {
+          sendConditionRecoveredMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
+        }
+      }
+    }
+  };
+
   // Remove all entries from the Campaign 'turnorder'
   var clearAll = function()
   {
     storeTurnOrder( [] );
     // These two might belong in install method
-    tbdCombat.completedTurns = [];
-    tbdCombat.turn = 0;
-    tbdCombat.round = 0;
+    state.tbdCombat.completedTurns = [];
+    state.tbdCombat.turn = 0;
+    state.tbdCombat.round = 0;
+    if ( state.tbdCombat.records !== undefined ) {
+      state.tbdCombat.records.forEach( function( record ) { purgeConditionRecord( record ); } );
+    }
+    state.tbdCombat.records = [];
   };
 
   // Cycle the turn order removing the first entry and placing it behind the last
@@ -173,15 +206,15 @@ var tbdCombat = tbdCombat || ( function()
       return true;
     }
     // Store the token object id for participants completing a turn
-    tbdCombat.completedTurns.push( participants[ 0 ].id );
+    state.tbdCombat.completedTurns.push( participants[ 0 ].id );
     participants.push( participants.shift() );
   };
 
   // Return true if the round has completely cycled
-  // Check to see if the top entry is in tbdCombat.completedTurns
+  // Check to see if the top entry is in state.tbdCombat.completedTurns
   var roundComplete = function( participants )
   {
-    return participants.length == 0 || tbdCombat.completedTurns.includes( participants[ 0 ].id );
+    return participants.length == 0 || state.tbdCombat.completedTurns.includes( participants[ 0 ].id );
   };
 
   // Return the initiative for the given character. 10 + bonuses
@@ -276,8 +309,8 @@ var tbdCombat = tbdCombat || ( function()
       + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat contract">Apply Condition</a>' ) + '</td></tr>'
       + '</table>';
 
-    if ( tbdCombat.turn == 0 ) {
-      const upcomingRound = String( tbdCombat.round + 1 );
+    if ( state.tbdCombat.turn == 0 ) {
+      const upcomingRound = String( state.tbdCombat.round + 1 );
       const menu = makeDiv(
         divStyle,
         makeDiv( headStyle, 'Combat' )
@@ -292,7 +325,7 @@ var tbdCombat = tbdCombat || ( function()
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( 'the 8-ball', '/w gm ' + menu );
     } else {
-      const round = String( tbdCombat.round );
+      const round = String( state.tbdCombat.round );
       const menu = makeDiv(
         divStyle,
         makeDiv( headStyle, 'Combat' )
@@ -322,22 +355,22 @@ var tbdCombat = tbdCombat || ( function()
   // turnOrder is the current participant array
   var advanceTurnAndNotifyOfRoundEnd = function( turnOrder )
   {
-    // Calling startRound advances tbdCombat.turn from zero to one
+    // Calling startRound advances state.tbdCombat.turn from zero to one
     // Start the round before advancing turns
-    if ( tbdCombat.turn > 0 ) {
+    if ( state.tbdCombat.turn > 0 ) {
       progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records );
       // TODO: reduce duration in associated condition records
       cycleTurnOrder( turnOrder );
       storeTurnOrder( turnOrder );
       if ( roundComplete( turnOrder ) ) {
-        sendChat( 'the 8-ball', '/w gm Round ' + tbdCombat.round + ' is complete.' );
+        sendChat( 'the 8-ball', '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
         // Set the turn to zero to indicate round is complete
-        tbdCombat.turn = 0;
+        state.tbdCombat.turn = 0;
         showCombatMenu();
       } else {
         showCombatMenu();
         announceTurn( turnOrder[ 0 ] );
-        tbdCombat.turn++;
+        state.tbdCombat.turn++;
       }
     } else {
       sendChat( 'the 8-ball', '/w gm Round has not started.' );
@@ -349,15 +382,15 @@ var tbdCombat = tbdCombat || ( function()
   var startRound = function( turnOrder )
   {
     // A round can only be started if not currently on a participant turn
-    if ( tbdCombat.turn == 0 ) {
+    if ( state.tbdCombat.turn == 0 ) {
       // It is only useful to start a round of combat if there are participants
       if ( turnOrder.length > 0 ) {
         // Ensure the participants order is sorted
         storeTurnOrder( appendUpdateAndSortParticipants( [] ) );
-        tbdCombat.completedTurns = [];
-        tbdCombat.turn++;
-        tbdCombat.round++;
-        sendChat( '', '/desc Start of Round ' + tbdCombat.round );
+        state.tbdCombat.completedTurns = [];
+        state.tbdCombat.turn++;
+        state.tbdCombat.round++;
+        sendChat( '', '/desc Start of Round ' + state.tbdCombat.round );
         showCombatMenu();
         announceTurn( turnOrder[ 0 ] );
       } else {
@@ -366,16 +399,6 @@ var tbdCombat = tbdCombat || ( function()
     } else {
       sendChat( 'the 8-ball', '/w gm Round has already started.' );
     }
-  };
-
-  var sendConditionContractedMessage = function( name, condition )
-  {
-    return sendChat( '', '/desc ' + name + condition.contract );
-  };
-
-  var sendConditionRecoveredMessage = function( name, condition )
-  {
-    return sendChat( '', '/desc ' + name + condition.recover );
   };
 
   // Reduce duration count for condition records applying to participant
@@ -389,20 +412,7 @@ var tbdCombat = tbdCombat || ( function()
       if ( participant.id == record.graphicId ) {
         record.duration -= 1;
         if ( record.duration <= 0 ) {
-          // Notify of condition recovery
-          const rollObject = getObj( Roll20.Objects.GRAPHIC, participant.id );
-          // Check to see that roll object is still defined -- it may have been removed
-          if ( rollObject !== undefined ) {
-            const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
-            const condition = findCondition( record.conditionName );
-            if ( condition !== undefined ) {
-              // Remove the graphical status marker
-              rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
-              if ( maybeCharacter !== undefined ) {
-                sendConditionRecoveredMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
-              }
-            }
-          }
+          purgeConditionRecord( record );
           // Remove the record rather than incrementing record index
           records.splice( recordIndex, 1 );
         } else {
@@ -470,7 +480,7 @@ var tbdCombat = tbdCombat || ( function()
               // allow addition of combatants only at the top of the round
               if ( message.selected === undefined || message.selected.length == 0 ) {
                 sendChat( 'the 8-ball', '/w gm No actors selected for initiative' );
-              } else if( tbdCombat.turn == 0 ) {
+              } else if( state.tbdCombat.turn == 0 ) {
                 var updatedParticipants = appendUpdateAndSortParticipants( collectSelectedParticipants( message.selected ) );
                 storeTurnOrder( updatedParticipants );
               } else {
@@ -514,8 +524,6 @@ var tbdCombat = tbdCombat || ( function()
         name: 'Poison',
         duration: 2 };
     }
-    // An array of objects generated by createConditionRecord
-    state.tbdCombat.records = [];
     on( 'chat:message', handleChatMessage );
 	};
 
