@@ -99,8 +99,23 @@ var tbdCombat = tbdCombat || ( function()
 
   // Note that two word condition names will require rework for resolution of api command
   var conditions = [];
-  conditions.push( createCondition( 'Poison', ' has been poisoned.', ' feels better.', 'radioactive' ) );
-  conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stopped burning.', 'half-haze' ) );
+  conditions.push( createCondition( 'Blind', ' is blind.', ' can see again.', 'sleepy' ) );
+  conditions.push( createCondition( 'Charmed', ' has been charmed.', ' is thinking clearly again.', 'half-heart' ) );
+  conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'lightning-helix' ) );
+  conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
+  conditions.push( createCondition( 'Fatigued', ' is fatigued.', ' is no longer fatigued.', 'tread' ) );
+  conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'ninja-mask' ) );
+  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'snail' ) );
+  conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'back-pain' ) );
+  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'bleeding-eye' ) );
+  conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'frozen-orb' ) );
+  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'archery-target' ) );
+  conditions.push( createCondition( 'Poisoned', ' is poisoned.', ' is no longer poisoned.', 'radioactive' ) );
+  conditions.push( createCondition( 'Prone', ' is prone.', ' is no longer prone.', 'arrowed' ) );
+  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', 'aura' ) );
+  conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', 'broken-shield' ) );
+  conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
+  conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'half-haze' ) );
 
   // Return the condition matching name. Return undefined if not found
   var findCondition = function( conditionName )
