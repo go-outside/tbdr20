@@ -317,7 +317,7 @@ var tbdCombat = tbdCombat || ( function()
         + makeDiv( subStyle, 'Round ' + upcomingRound + ' Setup' )
         + makeDiv( arrowStyle, '' )
           // Show options to add combatants and start round when between rounds
-          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add New Combatants</a>' )
+          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add Combatants</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat round">Start Round ' + upcomingRound + '</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
