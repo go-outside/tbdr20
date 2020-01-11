@@ -442,6 +442,27 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
+  // Find character matching condition record.
+  // On successful find, report condition and remaining duration to GM
+  // Do nothing when find fails
+  var sendConditionStatusMessageToGm = function( record )
+  {
+    const rollObject = getObj( Roll20.Objects.GRAPHIC, record.graphicId );
+    // Check to see that roll object is still defined -- it may have been removed
+    if ( rollObject != undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+      const condition = findCondition( record.conditionName );
+      if ( condition !== undefined ) {
+        // Remove the graphical status marker
+        rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
+        if ( maybeCharacter !== undefined ) {
+          sendChat( 'the 8-ball', '/w gm ' + maybeCharacter.get( Roll20.Objects.NAME ) 
+            + ' has ' + record.duration + ' rounds of ' + record.conditionName + ' remaining.' );
+        }
+      }
+    }
+  };
+
   // Reduce duration count for condition records applying to participant
   // If a record is reduced to zero duration, send recovery message and remove from records
   var progressConditionRecord = function( participant, records )
@@ -457,6 +478,8 @@ var tbdCombat = tbdCombat || ( function()
           // Remove the record rather than incrementing record index
           records.splice( recordIndex, 1 );
         } else {
+          // Report remaining duration to GM
+          sendConditionStatusMessageToGm( record );
           // Advance the loop index
           recordIndex++;
         }
@@ -504,6 +527,13 @@ var tbdCombat = tbdCombat || ( function()
     state.tbdCombat.conditionPrototype.duration = Math.max( 0, Math.floor( conditionDuration ) );
   };
 
+  // Set the visibility state for the turn order window
+  // pageViewable is boolean
+  var showInitiativePage = function( pageViewable )
+  {
+    Campaign().set( { initiativepage: pageViewable } );
+  };
+
   // Delegate resolution of chat event
   var handleChatMessage = function( message )
   {
@@ -514,7 +544,7 @@ var tbdCombat = tbdCombat || ( function()
         if ( command === '!combat' ) {
           var turnOrder = currentTurnOrder();
           if ( tokens.length == 1 ) {
-            // Store the current turn order just to make the turn order window appear
+            showInitiativePage( true );
             storeTurnOrder( turnOrder );
             showCombatMenu();
           } else {
@@ -524,6 +554,7 @@ var tbdCombat = tbdCombat || ( function()
               if ( message.selected === undefined || message.selected.length == 0 ) {
                 sendChat( 'the 8-ball', '/w gm No actors selected for initiative' );
               } else if( state.tbdCombat.turn == 0 ) {
+                showInitiativePage( true );
                 // appendAndUpdateParticipants modifies contents of turnOrder
                 appendAndUpdateParticipants( collectSelectedParticipants( message.selected ), turnOrder );
                 sortTurnOrder( turnOrder );
@@ -537,6 +568,7 @@ var tbdCombat = tbdCombat || ( function()
               advanceTurnAndNotifyOfRoundEnd( turnOrder );
             } else if ( subcommand == 'clear' ) {
               clearAll();
+              showInitiativePage( false );
               showCombatMenu();
             } else if ( subcommand == 'contract' ) {
               if ( message.selected === undefined || message.selected.length == 0 ) {
