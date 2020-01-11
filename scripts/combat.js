@@ -273,24 +273,29 @@ var tbdCombat = tbdCombat || ( function()
   // Override existing participants with the passed participants when id overlaps
   // Sort by initiative
   // Return the resulting array of participants
-  var appendUpdateAndSortParticipants = function( participants )
+  var appendAndUpdateParticipants = function( newParticipants, currentParticipants )
   {
-    var current = currentTurnOrder();
-    participants.forEach(
+    newParticipants.forEach(
       function( newParticipant )
       {
-        var matchingParticipant = current.find( function( currentParticipant ) { return currentParticipant.id == newParticipant.id; } );
+        var matchingParticipant = currentParticipants.find( function( currentParticipant ) { return currentParticipant.id == newParticipant.id; } );
         if ( matchingParticipant === undefined ) {
           // Add new participants to the current list
-          current.push( newParticipant );
+          currentParticipants.push( newParticipant );
         } else {
           // Update the contents for participants already in the list
-          copyParticipant( newParticipant, current );
+          copyParticipant( newParticipant, currentParticipants );
         }
       } );
+    return currentParticipants;
+  };
+
+  // Sort turnOrder by initiative
+  // Modifies contents of turnOrder
+  var sortTurnOrder = function( turnOrder )
+  {
     // pr is an awful parameter name forced by the r20 system. pr is initiative
-    current.sort( ( a, b ) => a.pr < b.pr );
-    return current;
+    turnOrder.sort( ( a, b ) => a.pr < b.pr );
   };
 
   var makeDiv = function( style, content )
@@ -363,10 +368,21 @@ var tbdCombat = tbdCombat || ( function()
   // Notify chat of participant turn
   var announceTurn = function( participant )
   {
-    const tokenName = participant.custom === undefined
-      ? getObj( Roll20.Objects.GRAPHIC, participant.id ).get( Roll20.Objects.NAME )
-      : participant.custom;
+    var tokenName = participant.custom;
+    if ( tokenName === undefined ) {
+      const graphic = getObj( Roll20.Objects.GRAPHIC, participant.id );
+      tokenName = graphic === undefined ? 'Illegal Turn' : graphic.get( Roll20.Objects.NAME );
+    }
     sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
+  };
+
+  // It appears as if Campaign.get( 'turnorder' ) does not change if one of its items is remove from play via the UI
+  // The turn order window reflects the removal from page, however api data for 'turnorder' is untouched.
+  // Remove any participants from turnOrder that are no longer represented on page
+  // Return a new turn order with only participants still on the page
+  var purgeTurnOrder = function( turnOrder )
+  {
+    return turnOrder.filter( function( participant ) { return getObj( Roll20.Objects.GRAPHIC, participant.id ) !== undefined; } );
   };
 
   // Advance the turn order. Notify gm of round end.
@@ -380,6 +396,10 @@ var tbdCombat = tbdCombat || ( function()
       progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records );
       // TODO: reduce duration in associated condition records
       cycleTurnOrder( turnOrder );
+      // Purge turn order after cycling.
+      // This avoids issue where turnOrder[ 0 ] would be purged and then 
+      // cycleTurnOrder would skip the following participant
+      turnOrder = purgeTurnOrder( turnOrder );
       storeTurnOrder( turnOrder );
       if ( roundComplete( turnOrder ) ) {
         sendChat( 'the 8-ball', '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
@@ -402,10 +422,12 @@ var tbdCombat = tbdCombat || ( function()
   {
     // A round can only be started if not currently on a participant turn
     if ( state.tbdCombat.turn == 0 ) {
+      turnOrder = purgeTurnOrder( turnOrder );
       // It is only useful to start a round of combat if there are participants
       if ( turnOrder.length > 0 ) {
         // Ensure the participants order is sorted
-        storeTurnOrder( appendUpdateAndSortParticipants( [] ) );
+        sortTurnOrder( turnOrder );
+        storeTurnOrder( turnOrder );
         state.tbdCombat.completedTurns = [];
         state.tbdCombat.turn++;
         state.tbdCombat.round++;
@@ -492,6 +514,8 @@ var tbdCombat = tbdCombat || ( function()
         if ( command === '!combat' ) {
           var turnOrder = currentTurnOrder();
           if ( tokens.length == 1 ) {
+            // Store the current turn order just to make the turn order window appear
+            storeTurnOrder( turnOrder );
             showCombatMenu();
           } else {
             const subcommand = tokens[ 1 ];
@@ -500,8 +524,10 @@ var tbdCombat = tbdCombat || ( function()
               if ( message.selected === undefined || message.selected.length == 0 ) {
                 sendChat( 'the 8-ball', '/w gm No actors selected for initiative' );
               } else if( state.tbdCombat.turn == 0 ) {
-                var updatedParticipants = appendUpdateAndSortParticipants( collectSelectedParticipants( message.selected ) );
-                storeTurnOrder( updatedParticipants );
+                // appendAndUpdateParticipants modifies contents of turnOrder
+                appendAndUpdateParticipants( collectSelectedParticipants( message.selected ), turnOrder );
+                sortTurnOrder( turnOrder );
+                storeTurnOrder( turnOrder );
               } else {
                 sendChat( 'the 8-ball', '/w gm Cannot add combatant in middle of round.' );
               }

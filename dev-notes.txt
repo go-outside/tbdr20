@@ -1,8 +1,11 @@
 
+It appears as ifn Campaign.get( 'turnorder' ) does not change if one of its items is remove from play
+interestingly the turn order window reflects the removal from page. It is just the api data that is not purged
+
 open TO on !combat
 close TO on !combat clear
 Report remaining conditions and durations to GM at end of participant turns
-
+on advance or announce turn, ensure turnOrder[ 0 ] is still present before acting
 
 on 'end-combat' add combat time to calendar? or update calendar to have combat round precision
 probably need per round precision in calendar for case of effects with duration extending beyound the combat
