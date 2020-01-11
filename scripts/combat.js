@@ -116,6 +116,10 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', 'broken-shield' ) );
   conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'half-haze' ) );
+  conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'chemical-bolt' ) );
+  // Added Hunters-Mark with dash to avoid using space. api commands currently parsed at spaces
+  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
+  conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'cobweb' ) );
 
   // Return the condition matching name. Return undefined if not found
   var findCondition = function( conditionName )

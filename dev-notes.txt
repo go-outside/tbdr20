@@ -1,4 +1,9 @@
 
+open TO on !combat
+close TO on !combat clear
+Report remaining conditions and durations to GM at end of participant turns
+
+
 on 'end-combat' add combat time to calendar? or update calendar to have combat round precision
 probably need per round precision in calendar for case of effects with duration extending beyound the combat
 maybe time is rounded up to nearest minute when combat ends
