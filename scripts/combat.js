@@ -452,13 +452,9 @@ var tbdCombat = tbdCombat || ( function()
     if ( rollObject != undefined ) {
       const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
       const condition = findCondition( record.conditionName );
-      if ( condition !== undefined ) {
-        // Remove the graphical status marker
-        rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
-        if ( maybeCharacter !== undefined ) {
-          sendChat( 'the 8-ball', '/w gm ' + maybeCharacter.get( Roll20.Objects.NAME ) 
-            + ' has ' + record.duration + ' rounds of ' + record.conditionName + ' remaining.' );
-        }
+      if ( condition !== undefined && maybeCharacter !== undefined ) {
+        sendChat( 'the 8-ball', '/w gm ' + maybeCharacter.get( Roll20.Objects.NAME ) 
+          + ' has ' + record.duration + ' rounds of ' + record.conditionName + ' remaining.' );
       }
     }
   };
@@ -593,7 +589,6 @@ var tbdCombat = tbdCombat || ( function()
 
   var registerEventHandlers = function()
   {
-    clearAll();
     if ( state.tbdCombat === undefined ) {
       state.tbdCombat = {};
       // The prototype stores input parameters for condition assignment
@@ -602,6 +597,7 @@ var tbdCombat = tbdCombat || ( function()
         duration: 2 };
     }
     on( 'chat:message', handleChatMessage );
+    log( 'There be dragons! Combat initialized.' );
 	};
 
   var runTests = function()
