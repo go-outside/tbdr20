@@ -17,6 +17,10 @@ var tbdCombat = tbdCombat || ( function()
     STRENGTH : 'strength',
     WISDOM : 'wisdom'
   };
+  Roll20.Events = {
+    CHAT_MESSAGE : 'chat:message',
+    CHANGE_CAMPAIGN_TURNORDER : 'change:campaign:turnorder'
+  };
   Roll20.Messages = {
     API : 'api'
   };
@@ -489,7 +493,7 @@ var tbdCombat = tbdCombat || ( function()
 
   // Advance the turn order. Notify gm of round end.
   // Turn order cannot advance until round begins
-  // turnOrder is the current participant array
+  // turnOrder is the current participant array before cycling for the turn
   var advanceTurnAndNotifyOfRoundEnd = function( turnOrder )
   {
     // Calling startRound advances state.tbdCombat.turn from zero to one
@@ -514,6 +518,8 @@ var tbdCombat = tbdCombat || ( function()
         state.tbdCombat.turn++;
       }
     } else {
+      // Store turn order here for case where turn was advanced via initative page and needs to be reset
+      storeTurnOrder( turnOrder );
       sendChat( Roll20.ANNOUNCER, '/w gm Round has not started.' );
     }
   };
@@ -554,7 +560,6 @@ var tbdCombat = tbdCombat || ( function()
         if ( command === '!combat' ) {
           var turnOrder = currentTurnOrder();
           if ( tokens.length == 1 ) {
-            showInitiativePage( true );
             storeTurnOrder( turnOrder );
             showCombatMenu();
           } else {
@@ -601,8 +606,20 @@ var tbdCombat = tbdCombat || ( function()
     }		
   };
 
+  var handleTurnOrderChange = function( campaignWithNewTurnOrder, campaignWithOriginalTurnOrder )
+  {
+    // This combat system must operate on the turn order before it has changed
+    // Forturnately the api provides the original turn order
+    const originalTurnOrder = JSON.parse( campaignWithOriginalTurnOrder[ Roll20.Objects.TURN_ORDER ] );
+    if ( state.tbdCombat.turn == 0 ) {
+      sortTurnOrder( originalTurnOrder );
+    } 
+    storeTurnOrder( originalTurnOrder );
+  };
+
   var registerEventHandlers = function()
   {
+    clearAll();
     if ( state.tbdCombat === undefined ) {
       state.tbdCombat = {};
       // The prototype stores input parameters for condition assignment
@@ -610,7 +627,9 @@ var tbdCombat = tbdCombat || ( function()
         name: 'Poison',
         duration: 2 };
     }
-    on( 'chat:message', handleChatMessage );
+    on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
+    on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
+
     log( 'There be dragons! Combat initialized.' );
 	};
 

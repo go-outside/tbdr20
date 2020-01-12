@@ -2,6 +2,16 @@
 It appears as ifn Campaign.get( 'turnorder' ) does not change if one of its items is remove from play
 interestingly the turn order window reflects the removal from page. It is just the api data that is not purged
 
+Remove condition at any time
+ -- add condition table with remove buttons
+
+Handle duplicate condition assignment (keep longest duration)
+
+right click 'add turn' -- add in middle of turn for mistake
+track on gm layer
+
+track on( 'destroy:graphic', handle... ) rather than purging turn order
+
 open TO on !combat
 close TO on !combat clear
 Report remaining conditions and durations to GM at end of participant turns
@@ -14,4 +24,18 @@ probably need per round precision in calendar for case of effects with duration 
 maybe time is rounded up to nearest minute when combat ends
 
 What does chat command /direct do?
+
+handleTurnOrder change only fires when turn order dialog is clicked -- not when set programmatically
+
+  // Return true if newTurnOrder matches originalTurnOrder where the first element has moved to the back
+  // Test by graphicId
+  var turnOrderHasBeenCycled = function( newTurnOrder, originalTurnOrder )
+  {
+    return originalTurnOrder.length > 0 && originalTurnOrder.length == newTurnOrder.length && originalTurnOrder.every(
+      function( originalParticipant, originalTurnIndex )
+      {
+        const newTurnIndex = ( originalTurnIndex == 0 ? originalTurnOrder.length : originalTurnIndex ) - 1;
+        return originalParticipant.graphicId == newTurnOrder[ newTurnIndex ].graphicId;
+      } );
+  };
 
