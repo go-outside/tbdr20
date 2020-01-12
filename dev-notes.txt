@@ -1,4 +1,5 @@
 
+the
 It appears as ifn Campaign.get( 'turnorder' ) does not change if one of its items is remove from play
 interestingly the turn order window reflects the removal from page. It is just the api data that is not purged
 
