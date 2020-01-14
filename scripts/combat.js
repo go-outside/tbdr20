@@ -110,10 +110,10 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'lightning-helix' ) );
   conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
   conditions.push( createCondition( 'Fatigued', ' is fatigued.', ' is no longer fatigued.', 'tread' ) );
-  conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'ninja-mask' ) );
+  conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'screaming' ) );
   conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'snail' ) );
   conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'back-pain' ) );
-  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'bleeding-eye' ) );
+  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'ninja-mask' ) );
   conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'frozen-orb' ) );
   conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'archery-target' ) );
   conditions.push( createCondition( 'Poisoned', ' is poisoned.', ' is no longer poisoned.', 'radioactive' ) );
@@ -123,9 +123,10 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'half-haze' ) );
   conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'chemical-bolt' ) );
-  // Added Hunters-Mark with dash to avoid using space. api commands currently parsed at spaces
-  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
   conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'cobweb' ) );
+  conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
+  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
+  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix' ) );
 
   // Return the condition matching name. Return undefined if not found
   var findCondition = function( conditionName )
