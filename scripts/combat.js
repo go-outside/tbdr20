@@ -627,6 +627,30 @@ var tbdCombat = tbdCombat || ( function()
     }		
   };
 
+  // Modify participat to make it a valid participant object
+  // Return true if modification was possible and participant has valid state
+  var validateParticipant = function( participant )
+  {
+    if ( participant.id === undefined ) {
+      return false;
+    }
+    if ( participant.pr !== undefined && participant.tookTurn !== undefined ) {
+      // Participant is already defined
+      return true;
+    }
+    // Attempt to identify character and initiative
+    const rollObject = getObj( Roll20.Objects.GRAPHIC, participant.id );
+    if ( rollObject !== undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+      if ( maybeCharacter !== undefined ) {
+        copyParticipant( createParticipant( rollObject.id, characterInitiative( maybeCharacter.id ) ), participant );
+        return true;
+      }
+    }
+    // Could not recover initiative value
+    return false;
+  };
+
   // The function arguents for this handler are a little bizarre.
   // There are two campaign inputs that look the same but actually have different type
   // It appears that newCampaign is a full fledged Roll20 object with a .get() method for properties
@@ -637,18 +661,24 @@ var tbdCombat = tbdCombat || ( function()
     const newTurnOrder = JSON.parse( newCampaign.get( Roll20.Objects.TURN_ORDER ) );
     const originalTurnOrder = JSON.parse( oldCampaign[ Roll20.Objects.TURN_ORDER ] );
     if ( newTurnOrder.length == originalTurnOrder.length ) {
+      // Assume that a same number of entries implies the identity of entries remains the same.
       // Turn order cannot be modified outside of the combat panel.
-      // Override the change.
-      sortTurnOrder( originalTurnOrder );
-      storeTurnOrder( originalTurnOrder );
-    } else {
-      // If round has already started, this addition might set a new current turn
-      maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder );
-      // A participant has been added or removed
+      // However modification of initiative values is allowed here.
+      // Re-sort to keep original order respecting initiative value change
       sortTurnOrder( newTurnOrder );
       storeTurnOrder( newTurnOrder );
+      // If round has already started, this addition might set a new current turn
+      maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder );
+    } else {
+      // Handle addition of participant via right-click, add turn from map
+      const validatedTurnOrder = newTurnOrder.filter( function( participant ) { return validateParticipant( participant ); } );
+      // A participant has been added or removed
+      sortTurnOrder( validatedTurnOrder );
+      storeTurnOrder( validatedTurnOrder );
+      // If round has already started, this addition might set a new current turn
+      maybeReannounceTurn( originalTurnOrder[ 0 ], validatedTurnOrder );
       // If the last participant was removed, end the round
-      if ( roundComplete( newTurnOrder ) ) {
+      if ( roundComplete( validatedTurnOrder ) ) {
         endRound();
       }
     }
