@@ -153,9 +153,16 @@ var tbdCombat = tbdCombat || ( function()
     destination.id = source.id;
     destination.pr = source.pr;
     destination.custom = source.custom;
+    destination.tookTurn = source.tookTurn;
     return destination;
   };
 
+  // Return a new Participant object to insert into 'turnorder'
+  var createParticipant = function( graphicId, initiative )
+  {
+    return { id: graphicId, pr: initiative, tookTurn: false };
+  };
+  
   // Global state serialization
   // Return a copied participant array from Campaign
   var currentTurnOrder = function()
@@ -182,7 +189,7 @@ var tbdCombat = tbdCombat || ( function()
   var sortTurnOrder = function( turnOrder )
   {
     // pr is an awful parameter name forced by the r20 system. pr is initiative
-    turnOrder.sort( ( a, b ) => a.pr < b.pr );
+    turnOrder.sort( ( a, b ) => a.tookTurn == b.tookTurn ? ( a.pr < b.pr ) : ( a.tookTurn > b.tookTurn ) );
   };
 
   // Global state serialization
@@ -192,23 +199,11 @@ var tbdCombat = tbdCombat || ( function()
     Campaign().set( Roll20.Objects.TURN_ORDER, JSON.stringify( participants ) );
   };
 
-  // Cycle the turn order removing the first entry and placing it behind the last
-  // Modifies sequence of participants
-  var cycleTurnOrder = function( participants )
-  {
-    if ( participants.length < 1 ) {
-      return true;
-    }
-    // Store the token object id for participants completing a turn
-    state.tbdCombat.completedTurns.push( participants[ 0 ].id );
-    participants.push( participants.shift() );
-  };
-
   // Return true if the round has completely cycled
-  // Check to see if the top entry is in state.tbdCombat.completedTurns
+  // Check to see that every entry has tookTurn == true
   var roundComplete = function( participants )
   {
-    return participants.length == 0 || state.tbdCombat.completedTurns.includes( participants[ 0 ].id );
+    return participants.length == 0 || participants.every( function( participant ) { return participant.tookTurn == true; } );
   };
 
   // Return the roll modifier due to a particular ability score
@@ -290,8 +285,6 @@ var tbdCombat = tbdCombat || ( function()
   var clearAll = function()
   {
     storeTurnOrder( [] );
-    // These two might belong in install method
-    state.tbdCombat.completedTurns = [];
     state.tbdCombat.turn = 0;
     state.tbdCombat.round = 0;
     if ( state.tbdCombat.records !== undefined ) {
@@ -317,7 +310,7 @@ var tbdCombat = tbdCombat || ( function()
           // Perhaps the non-underscore values must be retrieved via .get
           // This holds for rollObject and maybeCharacter
           // Not sure what pr means, but it stores the value r20 uses for turn order
-          participants.push( { id: rollObject.id, pr: characterInitiative( maybeCharacter.id ) } );
+          participants.push( createParticipant( rollObject.id, characterInitiative( maybeCharacter.id ) ) );
         }
       } );
     return participants;
@@ -375,7 +368,6 @@ var tbdCombat = tbdCombat || ( function()
   // Appends generated condition records to records
   var appendConditionRecords = function( selectObjects, prototype, records )
   {
-    var conditionRecords = [];
     const condition = findCondition( prototype.name );
     const duration = prototype.duration;
     if ( condition !== undefined ) {
@@ -501,8 +493,11 @@ var tbdCombat = tbdCombat || ( function()
     // Start the round before advancing turns
     if ( state.tbdCombat.turn > 0 ) {
       progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records );
-      // TODO: reduce duration in associated condition records
-      cycleTurnOrder( turnOrder );
+      // Mark turn taken for first combatant and resort the order
+      if ( turnOrder.length > 0 ) {
+        participants[ 0 ].tookTurn = true;
+        sortTurnOrder( participants );
+      }
       // Purge turn order after cycling.
       // This avoids issue where turnOrder[ 0 ] would be purged and then 
       // cycleTurnOrder would skip the following participant
@@ -534,10 +529,11 @@ var tbdCombat = tbdCombat || ( function()
       turnOrder = purgeTurnOrder( turnOrder );
       // It is only useful to start a round of combat if there are participants
       if ( turnOrder.length > 0 ) {
+        // Clear the turn taken state
+        turnOrder.forEach( function( participant ) { participant.tookTurn = false; } );
         // Ensure the participants order is sorted
         sortTurnOrder( turnOrder );
         storeTurnOrder( turnOrder );
-        state.tbdCombat.completedTurns = [];
         state.tbdCombat.turn++;
         state.tbdCombat.round++;
         sendChat( '', '/desc Start of Round ' + state.tbdCombat.round );
@@ -620,6 +616,8 @@ var tbdCombat = tbdCombat || ( function()
 
   var registerEventHandlers = function()
   {
+    // TODO: remove this line
+    state.tbdCombat.completedTurns = undefined;
     clearAll();
     if ( state.tbdCombat === undefined ) {
       state.tbdCombat = {};
