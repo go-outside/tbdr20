@@ -245,6 +245,18 @@ var tbdCombat = tbdCombat || ( function()
     sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
   };
 
+  // Check to see if the round has started
+  // If round has started and originalCurrent turn is different than turnOrder[ 0 ], announce that turn order has changed
+  var maybeReannounceTurn = function( originalCurrentTurnParticipant, turnOrder )
+  {
+    if ( state.tbdCombat.turn > 0 ) {
+      if ( originalCurrentTurnParticipant.id != turnOrder[ 0 ].id ) {
+        sendChat( '', '/desc Current turn has been modified.' );
+        announceTurn( turnOrder[ 0 ] );
+      }
+    }
+  };
+
   // Find character matching condition record.
   // On successful find, report condition and remaining duration to GM
   // Do nothing when find fails
@@ -330,8 +342,8 @@ var tbdCombat = tbdCombat || ( function()
           // Add new participants to the current list
           currentParticipants.push( newParticipant );
         } else {
-          // Update the contents for participants already in the list
-          copyParticipant( newParticipant, currentParticipants );
+          // Update initiative for participants that are already tracked
+          currentParticipant.pr = newParticipant.pr;
         }
       } );
     return currentParticipants;
@@ -475,48 +487,13 @@ var tbdCombat = tbdCombat || ( function()
         + makeDiv( subStyle, 'Round ' + round + ' Turns' )
         + makeDiv( arrowStyle, '' )
           // Show option to advance turn during the round
+          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add Combatants</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat advance">Advance Turn</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
           + makeDiv( arrowStyle, '' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
-    }
-  };
-
-  // Advance the turn order. Notify gm of round end.
-  // Turn order cannot advance until round begins
-  // turnOrder is the current participant array before cycling for the turn
-  var advanceTurnAndNotifyOfRoundEnd = function( turnOrder )
-  {
-    // Calling startRound advances state.tbdCombat.turn from zero to one
-    // Start the round before advancing turns
-    if ( state.tbdCombat.turn > 0 ) {
-      progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records );
-      // Mark turn taken for first combatant and resort the order
-      if ( turnOrder.length > 0 ) {
-        participants[ 0 ].tookTurn = true;
-        sortTurnOrder( participants );
-      }
-      // Purge turn order after cycling.
-      // This avoids issue where turnOrder[ 0 ] would be purged and then 
-      // cycleTurnOrder would skip the following participant
-      turnOrder = purgeTurnOrder( turnOrder );
-      storeTurnOrder( turnOrder );
-      if ( roundComplete( turnOrder ) ) {
-        sendChat( Roll20.ANNOUNCER, '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
-        // Set the turn to zero to indicate round is complete
-        state.tbdCombat.turn = 0;
-        showCombatMenu();
-      } else {
-        showCombatMenu();
-        announceTurn( turnOrder[ 0 ] );
-        state.tbdCombat.turn++;
-      }
-    } else {
-      // Store turn order here for case where turn was advanced via initative page and needs to be reset
-      storeTurnOrder( turnOrder );
-      sendChat( Roll20.ANNOUNCER, '/w gm Round has not started.' );
     }
   };
 
@@ -547,6 +524,52 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
+  // Supply message and cleanup the combat turn.
+  // Show the combat menu
+  var endRound = function()
+  {
+    sendChat( Roll20.ANNOUNCER, '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
+    // Set the turn to zero to indicate round is complete
+    state.tbdCombat.turn = 0;
+    showCombatMenu();
+  };
+
+  // Advance the turn order. Notify gm of round end.
+  // Turn order cannot advance until round begins
+  // turnOrder is the current participant array before cycling for the turn
+  var advanceTurnAndNotifyOfRoundEnd = function( turnOrder )
+  {
+    // Calling startRound advances state.tbdCombat.turn from zero to one
+    // Start the round before advancing turns
+    if ( state.tbdCombat.turn > 0 ) {
+      if ( turnOrder[ 0 ].tookTurn == false ) {
+        // Advance condition state only for participants who have not completed their turn yet
+        // Ideally tookTurn will always be false at this point because other logic prevents advance on a stale turn
+        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records );
+      }
+      // Mark turn taken for first combatant and resort the order
+      if ( turnOrder.length > 0 ) {
+        turnOrder[ 0 ].tookTurn = true;
+        sortTurnOrder( turnOrder );
+      }
+      // Purge turn order after cycling.
+      // This avoids issue where turnOrder[ 0 ] could be purged and then cycling would effectively skip the following participant
+      turnOrder = purgeTurnOrder( turnOrder );
+      storeTurnOrder( turnOrder );
+      if ( roundComplete( turnOrder ) ) {
+        endRound();
+      } else {
+        showCombatMenu();
+        announceTurn( turnOrder[ 0 ] );
+        state.tbdCombat.turn++;
+      }
+    } else {
+      // Store turn order here for case where turn was advanced via initative page and needs to be reset
+      storeTurnOrder( turnOrder );
+      sendChat( Roll20.ANNOUNCER, '/w gm Round has not started.' );
+    }
+  };
+
   // Delegate resolution of chat event
   var handleChatMessage = function( message )
   {
@@ -565,14 +588,15 @@ var tbdCombat = tbdCombat || ( function()
               // allow addition of combatants only at the top of the round
               if ( message.selected === undefined || message.selected.length == 0 ) {
                 sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for initiative' );
-              } else if( state.tbdCombat.turn == 0 ) {
+              } else {
                 showInitiativePage( true );
+                const originalCurrentTurn = turnOrder[ 0 ];
                 // appendAndUpdateParticipants modifies contents of turnOrder
                 appendAndUpdateParticipants( collectSelectedParticipants( message.selected ), turnOrder );
                 sortTurnOrder( turnOrder );
+                // If round has already started, this addition might set the current turn
+                maybeReannounceTurn( originalCurrentTurn, turnOrder );
                 storeTurnOrder( turnOrder );
-              } else {
-                sendChat( Roll20.ANNOUNCER, '/w gm Cannot add combatant in middle of round.' );
               }
             } else if ( subcommand == 'round' ) {
               startRound( turnOrder );
@@ -603,15 +627,31 @@ var tbdCombat = tbdCombat || ( function()
     }		
   };
 
-  var handleTurnOrderChange = function( campaignWithNewTurnOrder, campaignWithOriginalTurnOrder )
+  // The function arguents for this handler are a little bizarre.
+  // There are two campaign inputs that look the same but actually have different type
+  // It appears that newCampaign is a full fledged Roll20 object with a .get() method for properties
+  // However oldCampaign is a plain JavaScript object without the .get() method.
+  // Both newCampaign and oldCampaign appear the same when output to log
+  var handleTurnOrderChange = function( newCampaign, oldCampaign )
   {
-    // This combat system must operate on the turn order before it has changed
-    // Forturnately the api provides the original turn order
-    const originalTurnOrder = JSON.parse( campaignWithOriginalTurnOrder[ Roll20.Objects.TURN_ORDER ] );
-    if ( state.tbdCombat.turn == 0 ) {
+    const newTurnOrder = JSON.parse( newCampaign.get( Roll20.Objects.TURN_ORDER ) );
+    const originalTurnOrder = JSON.parse( oldCampaign[ Roll20.Objects.TURN_ORDER ] );
+    if ( newTurnOrder.length == originalTurnOrder.length ) {
+      // Turn order cannot be modified outside of the combat panel.
+      // Override the change.
       sortTurnOrder( originalTurnOrder );
-    } 
-    storeTurnOrder( originalTurnOrder );
+      storeTurnOrder( originalTurnOrder );
+    } else {
+      // If round has already started, this addition might set a new current turn
+      maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder );
+      // A participant has been added or removed
+      sortTurnOrder( newTurnOrder );
+      storeTurnOrder( newTurnOrder );
+      // If the last participant was removed, end the round
+      if ( roundComplete( newTurnOrder ) ) {
+        endRound();
+      }
+    }
   };
 
   var registerEventHandlers = function()
