@@ -343,7 +343,7 @@ var tbdCombat = tbdCombat || ( function()
           currentParticipants.push( newParticipant );
         } else {
           // Update initiative for participants that are already tracked
-          currentParticipant.pr = newParticipant.pr;
+          matchingParticipant.pr = newParticipant.pr;
         }
       } );
     return currentParticipants;
