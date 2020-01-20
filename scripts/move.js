@@ -33,6 +33,7 @@ var tbdMove = tbdMove || ( function()
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
     CONTROLLEDBY : 'controlledby',
+    DISPLAY_NAME : 'displayname',
     GRAPHIC : 'graphic',
     ID : 'id',
     LEFT : 'left',
@@ -95,7 +96,7 @@ var tbdMove = tbdMove || ( function()
     const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
 
     const mover = findMoverByPlayer( playerId );
-    const remaining = mover === undefined ? '' : makeDiv( subStyle, 'Remaining: ' + mover.circles[ mover.circles.length - 1 ].radius );
+    const remaining = mover === undefined ? '' : ( makeDiv( arrowStyle, '' ) + 'Remaining: ' + mover.circles[ mover.circles.length - 1 ].radius.toFixed( 0 ) );
     const undo = mover === undefined || mover.circles.length < 2 ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move undo">Undo</a>' );
     const menu = makeDiv(
       divStyle,
@@ -105,7 +106,8 @@ var tbdMove = tbdMove || ( function()
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move start">Start</a>' )
         + undo
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' ) );
-    sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
+    const player = getObj( Roll20.Objects.PLAYER, playerId );
+    sendChat( Roll20.ANNOUNCER, '/w "' + player.get( Roll20.Objects.DISPLAY_NAME ) + '" ' + menu );
   };
 
 
@@ -123,7 +125,7 @@ var tbdMove = tbdMove || ( function()
           const newCircle = circleOnMap( graphic, 0 );
           const dx = newCircle.x - lastCircle.x;
           const dy = newCircle.y - lastCircle.y;
-          if ( Math.abs( dx ) > 0 || Math.abs( dy > 0 ) ) {
+          if ( Math.abs( dx ) > 0 || Math.abs( dy ) > 0 ) {
             const distance = Math.sqrt( dx * dx + dy * dy );
             addMovementCircle( graphic, mover, lastCircle.radius - distance );
             showMoveMenu( mover.playerId );
@@ -227,7 +229,9 @@ var tbdMove = tbdMove || ( function()
   var createCircleGraphic = function( circle, graphic )
   {
     const radius = circle.radius;
-    const halfRadius = 0.5 * radius;
+    // 0, 0.22382, 0.5, 0.77614, 1
+    // 1.0 - 2.0 * 0.22382
+    const halfRadius = 0.55236 * radius;
     const path = [
       [ 'M', -radius, 0 ],
       [ 'C', -radius, -halfRadius, -halfRadius, -radius, 0, -radius ],
@@ -275,13 +279,9 @@ var tbdMove = tbdMove || ( function()
       if ( mover.circles.length > 1 ) {
         mover.circles.pop();
         if ( mover.circlePathIds.length > mover.circles.length ) {
-          log( 'here' );
           const circlePathId = mover.circlePathIds.pop();
-          log( circlePathId );
           const circleGraphic = getObj( Roll20.Objects.PATH, circlePathId );
-          log( circleGraphic );
           if ( circleGraphic !== undefined ) {
-            log( 'here2' );
             circleGraphic.remove();
           }
         }
@@ -295,9 +295,19 @@ var tbdMove = tbdMove || ( function()
   // Append onto state.tbdMove.movers
   var maybeCreateMover = function( playerId, graphicId )
   {
-
-    // Purge any other movers from the movers list that are controlled by playerId
-
+    // Purge any other mover from the movers list that are controlled by playerId
+    const originalMovers = state.tbdMove.movers;
+    state.tbdMove.movers = [];
+    originalMovers.forEach(
+      function( mover )
+      {
+        if ( mover.playerId == playerId ) {
+          clearMoverCircleGraphics( mover );
+        } else {
+          state.tbdMove.movers.push( mover );
+        }
+      } );
+    // Now make the new mover if possible
     const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
     if ( graphic !== undefined ) {
       const controllers = graphic.get( Roll20.Objects.CONTROLLEDBY ).split( ',' );
