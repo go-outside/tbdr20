@@ -465,7 +465,8 @@ var tbdCalendar = tbdCalendar || ( function()
   var registerEventHandlers = function()
   {
     on( 'chat:message', handleChatMessage );
-	};
+    log( 'There be dragons! Calendar initialized.' );
+  };
 
   var runTests = function()
   {
