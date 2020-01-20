@@ -135,12 +135,15 @@ var tbdCombat = tbdCombat || ( function()
   }
   
   // Create a record of a condition to associate with a token
+  // conditionId: unique identifier for tracking the condition in condition table
   // graphicId: the id of the graphic on which to associate the condition
   // conditionName: the name of condition
   // duration: the number of rounds remaining for the condition's effect
   var createConditionRecord = function( graphicId, conditionName, duration )
   {
+    const conditionId = ++state.tbdCombat.conditionCount;
     return {
+      conditionId: conditionId,
       graphicId: graphicId,
       conditionName: conditionName,
       duration: duration };
@@ -303,6 +306,7 @@ var tbdCombat = tbdCombat || ( function()
       state.tbdCombat.records.forEach( function( record ) { purgeConditionRecord( record ); } );
     }
     state.tbdCombat.records = [];
+    state.tbdCombat.conditionCount = 0;
   };
 
   // Pass an array of selectObjects presumably from a message.selected
@@ -349,7 +353,7 @@ var tbdCombat = tbdCombat || ( function()
     return currentParticipants;
   };
 
-    // Reduce duration count for condition records applying to participant
+  // Reduce duration count for condition records applying to participant
   // If a record is reduced to zero duration, send recovery message and remove from records
   var progressConditionRecord = function( participant, records )
   {
@@ -365,7 +369,8 @@ var tbdCombat = tbdCombat || ( function()
           records.splice( recordIndex, 1 );
         } else {
           // Report remaining duration to GM
-          sendConditionStatusMessageToGm( record );
+          // Report disabled with addition of Condition Durations table
+          // sendConditionStatusMessageToGm( record );
           // Advance the loop index
           recordIndex++;
         }
@@ -397,6 +402,20 @@ var tbdCombat = tbdCombat || ( function()
           }
         } );
     }
+  };
+
+  // Remove all condition records from global state that match the given conditionId
+  var removeConditionRecord = function( conditionId )
+  {
+    // Update graphic and send recovery messages
+    state.tbdCombat.records.forEach( 
+      function( record )
+      {
+        if ( record.conditionId == conditionId ) {
+          purgeConditionRecord( record );
+        }
+      } );
+    state.tbdCombat.records = state.tbdCombat.records.filter( function( record ) { return record.conditionId != conditionId; } );
   };
 
   // Store condition name for the prototype condition stored in global state
@@ -440,6 +459,30 @@ var tbdCombat = tbdCombat || ( function()
     return '?{' + optionsString + '}';
   };
 
+  // Return html string to represent a condition record in the condition table
+  // Contains character name, condition name, condition duration, and delete button in a table row
+  var conditionTableRow = function( record )
+  {
+    // selectObjects are pure state. Call getObj to get full fledged Roll20 Objects, which have .get method
+    const rollObject = getObj( Roll20.Objects.GRAPHIC, record.graphicId );
+    if ( rollObject !== undefined ) {
+      const anchorStyle = 'style="border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px; box-shadow: 1px 1px 1px #707070;"';
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+      const characterName = maybeCharacter === undefined ? 'Unknown' : maybeCharacter.get( Roll20.Objects.NAME );
+      return '<tr><td><b>' + characterName + '</b></td><td>' + record.conditionName + '</td><td>' + String( record.duration ) + '</td>'
+        + '<td><a ' + anchorStyle + ' href="!combat removecondition ' + String( record.conditionId ) + '"><b>X</b></a></td></tr>';
+    }
+    return '';
+  };
+
+  // Return a condition table entry for the combat menu
+  var conditionTable = function( conditionRecords )
+  {
+    var content = '';
+    conditionRecords.forEach( function( record ) { content = content + conditionTableRow( record ); } );
+    return '<table style=\'margin-left:auto; margin-right:auto; font-size: 12px; width: 200px\'>' + content + '</table>';
+  };
+
   // Render the primary UI to the chat window.
   // Functions in two modes:
   // 1. Setting up the turn. This is the state after using 'Clear' and before using 'Start Round'
@@ -463,7 +506,9 @@ var tbdCombat = tbdCombat || ( function()
       + '<tr><td>Duration </td><td><a ' + anchorStyle1 + '" href="!combat setconditionduration ?{Duration?|' + duration + '}">' + duration + '</a></td></tr>'
       + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat contract">Apply Condition</a>' ) + '</td></tr>'
       + '</table>';
-
+    const conditionDurations = state.tbdCombat.records.length == 0
+      ? ''
+      : makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Condition Durations' ) + conditionTable( state.tbdCombat.records );
     if ( state.tbdCombat.turn == 0 ) {
       const upcomingRound = String( state.tbdCombat.round + 1 );
       const menu = makeDiv(
@@ -476,6 +521,7 @@ var tbdCombat = tbdCombat || ( function()
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat round">Start Round ' + upcomingRound + '</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
+          + conditionDurations
           + makeDiv( arrowStyle, '' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
@@ -491,6 +537,7 @@ var tbdCombat = tbdCombat || ( function()
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat advance">Advance Turn</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
+          + conditionDurations
           + makeDiv( arrowStyle, '' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
@@ -594,6 +641,7 @@ var tbdCombat = tbdCombat || ( function()
                 // appendAndUpdateParticipants modifies contents of turnOrder
                 appendAndUpdateParticipants( collectSelectedParticipants( message.selected ), turnOrder );
                 sortTurnOrder( turnOrder );
+                showCombatMenu();
                 // If round has already started, this addition might set the current turn
                 maybeReannounceTurn( originalCurrentTurn, turnOrder );
                 storeTurnOrder( turnOrder );
@@ -611,7 +659,11 @@ var tbdCombat = tbdCombat || ( function()
                 sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for condition' );
               } else {
                 appendConditionRecords( message.selected, state.tbdCombat.conditionPrototype, state.tbdCombat.records );
+                showCombatMenu();
               }
+            } else if ( subcommand == 'removecondition' && tokens.length == 3 ) {
+              removeConditionRecord( Number( tokens[ 2 ] ) );
+              showCombatMenu();
             } else if ( subcommand == 'setconditionname' && tokens.length == 3 ) {
               setPrototypeCondition( tokens[ 2 ] );
               showCombatMenu();
@@ -686,8 +738,6 @@ var tbdCombat = tbdCombat || ( function()
 
   var registerEventHandlers = function()
   {
-    // TODO: remove this line
-    state.tbdCombat.completedTurns = undefined;
     clearAll();
     if ( state.tbdCombat === undefined ) {
       state.tbdCombat = {};
@@ -696,6 +746,10 @@ var tbdCombat = tbdCombat || ( function()
         name: 'Poison',
         duration: 2 };
     }
+    if ( state.tbdCombat.conditionCount === undefined ) {
+      state.tbdCombat.conditionCount = 0;
+    }
+
     on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
     on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
 
