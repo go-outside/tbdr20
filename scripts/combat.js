@@ -738,9 +738,11 @@ var tbdCombat = tbdCombat || ( function()
 
   var registerEventHandlers = function()
   {
-    clearAll();
     if ( state.tbdCombat === undefined ) {
       state.tbdCombat = {};
+      state.tbdCombat.turn = 0;
+      state.tbdCombat.round = 0;
+      state.tbdCombat.records = [];
       // The prototype stores input parameters for condition assignment
       state.tbdCombat.conditionPrototype = {
         name: 'Poison',
@@ -749,6 +751,7 @@ var tbdCombat = tbdCombat || ( function()
     if ( state.tbdCombat.conditionCount === undefined ) {
       state.tbdCombat.conditionCount = 0;
     }
+    clearAll();
 
     on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
     on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
