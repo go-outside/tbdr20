@@ -229,8 +229,7 @@ var tbdMove = tbdMove || ( function()
   var createCircleGraphic = function( circle, graphic )
   {
     const radius = circle.radius;
-    // 0, 0.22382, 0.5, 0.77614, 1
-    // 1.0 - 2.0 * 0.22382
+    // Magic 'half' radius here is required to create a circular shape
     const halfRadius = 0.55236 * radius;
     const path = [
       [ 'M', -radius, 0 ],
