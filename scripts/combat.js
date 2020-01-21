@@ -123,7 +123,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'chemical-bolt' ) );
   conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'cobweb' ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
-  conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'angel-outfit' ) );
+  conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'fluffy-wing' ) );
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
   conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix' ) );
 
