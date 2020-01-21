@@ -105,11 +105,9 @@ var tbdCombat = tbdCombat || ( function()
 
   // Note that two word condition names will require rework for resolution of api command
   var conditions = [];
-  conditions.push( createCondition( 'Blind', ' is blind.', ' can see again.', 'sleepy' ) );
   conditions.push( createCondition( 'Charmed', ' has been charmed.', ' is thinking clearly again.', 'half-heart' ) );
-  conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'lightning-helix' ) );
+  conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'broken-skull' ) );
   conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
-  conditions.push( createCondition( 'Fatigued', ' is fatigued.', ' is no longer fatigued.', 'tread' ) );
   conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'screaming' ) );
   conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'snail' ) );
   conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'back-pain' ) );
@@ -125,6 +123,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'chemical-bolt' ) );
   conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'cobweb' ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
+  conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'angel-outfit' ) );
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
   conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix' ) );
 
