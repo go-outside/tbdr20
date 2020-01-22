@@ -18,6 +18,10 @@ var tbdMove = tbdMove || ( function()
     STRENGTH : 'strength',
     WISDOM : 'wisdom'
   };
+  Roll20.Colors = {
+    BLACK : '#000000',
+    WHITE : '#FFFFFF'
+  };
   Roll20.Events = {
     CHAT_MESSAGE : 'chat:message',
     CHANGE_CAMPAIGN_TURNORDER : 'change:campaign:turnorder',
@@ -32,6 +36,7 @@ var tbdMove = tbdMove || ( function()
     ALL : 'all',
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
+    COLOR : 'color',
     CONTROLLEDBY : 'controlledby',
     DISPLAY_NAME : 'displayname',
     GRAPHIC : 'graphic',
@@ -58,7 +63,7 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Return a new mover object
-  var createMover = function( graphicId, characterId, playerId )
+  var createMover = function( graphicId, characterId, playerId, color )
   {
     return { 
       graphicId: graphicId, 
@@ -68,7 +73,9 @@ var tbdMove = tbdMove || ( function()
       // An array of map circles generated from circleOnMap
       circles: [], 
       // An array of path ids for decorations placed on page
-      circlePathIds: [] };
+      circlePathIds: [],
+      // Assigns base color for movement graphics
+      color: color };
   };
 
   // Return the mover associated with playerId
@@ -121,15 +128,9 @@ var tbdMove = tbdMove || ( function()
       if ( mover !== undefined ) {
         const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
         if ( graphic !== undefined ) {
-          const lastCircle = mover.circles[ mover.circles.length - 1 ];
-          const newCircle = circleOnMap( graphic, 0 );
-          const dx = newCircle.x - lastCircle.x;
-          const dy = newCircle.y - lastCircle.y;
-          if ( Math.abs( dx ) > 0 || Math.abs( dy ) > 0 ) {
-            const distance = Math.sqrt( dx * dx + dy * dy );
-            addMovementCircle( graphic, mover, lastCircle.radius - distance );
-            showMoveMenu( mover.playerId );
-          }
+          addMovementCircle( graphic, mover );
+          updateMoverGraphics( graphic, mover );
+          showMoveMenu( mover.playerId );
         }
       }
     }
@@ -147,11 +148,10 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Return a canvas circle for the current map circle.
-  // graphic is a Roll20 object used to obtain the page
-  // Assume graphic is valid and is linked to a valid page
-  var canvasCircleFrom = function( mapCircle, graphic )
+  // pageId identifies the page scale for sizing
+  var canvasCircleFrom = function( mapCircle, pageId )
   {
-    const page = getObj( Roll20.Objects.PAGE, graphic.get( Roll20.Objects.PAGEID ) );
+    const page = getObj( Roll20.Objects.PAGE, pageId );
     const scale = Roll20.DistanceUnit / page.get( Roll20.Objects.SCALE_NUMBER );
     return {
       left: scale * mapCircle.x,
@@ -160,11 +160,10 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Return a map circle for the provided canvas circle
-  // graphic is a Roll20 object used to obtain the page
-  // Assume graphic is valid and is linked to a valid page
-  var mapCircleFrom = function( canvasCircle, graphic )
+  // pageId identifies the page scale for sizing
+  var mapCircleFrom = function( canvasCircle, pageId )
   {
-    const page = getObj( Roll20.Objects.PAGE, graphic.get( Roll20.Objects.PAGEID ) );
+    const page = getObj( Roll20.Objects.PAGE, pageId );
     const scale = page.get( Roll20.Objects.SCALE_NUMBER ) / Roll20.DistanceUnit;
     return {
       x: scale * canvasCircle.left,
@@ -184,7 +183,7 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Remove any graphical or state circlePathIds associated with mover
-  var clearMoverCircleGraphics = function( mover )
+  var clearMoverPaths = function( mover )
   {
     mover.circlePathIds.forEach( 
       function( circlePathId )
@@ -206,7 +205,7 @@ var tbdMove = tbdMove || ( function()
       {
         const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
         if ( graphic === undefined ) {
-          clearMoverCircleGraphics( mover );
+          clearMoverPaths( mover );
         } else {
           keepers.push( mover );
         }
@@ -218,15 +217,59 @@ var tbdMove = tbdMove || ( function()
   var clearAll = function()
   {
     if ( state.tbdMove.movers !== undefined ) {
-      state.tbdMove.movers.forEach( function( mover ) { clearMoverCircleGraphics( mover ); } );
+      state.tbdMove.movers.forEach( function( mover ) { clearMoverPaths( mover ); } );
     }
     state.tbdMove.movers = [];
   };
 
+  // Return a line path connecting the center of each circle in circles
+  // Return undefined if circles has size less than two
+  // circles are in canvas coordinates
+  // path is created on pageId
+  var createCirclePathGraphic = function( circles, pageId, color )
+  {
+    if ( circles.length > 1 ) {
+      const firstCircle = circles[ 0 ];
+      const minimum = { x: 1e6, y: 1e6 };
+      const maximum = { x: 0, y: 0 };
+      const rawPath = circles.map( 
+        function( circle ) 
+        { 
+          const x = circle.left;
+          const y = circle.top;
+          minimum.x = Math.min( x, minimum.x );
+          minimum.y = Math.min( y, minimum.y );
+          maximum.x = Math.max( x, maximum.x );
+          maximum.y = Math.max( y, maximum.y );
+          return { x: x, y: y }; 
+        } );
+      const path = rawPath.map(
+        function( point, pointIndex )
+        {
+          return [ pointIndex == 0 ? 'M' : 'L', point.x - minimum.x, point.y - minimum.y ];
+        } );
+      const circleObject = createObj( 
+        Roll20.Objects.PATH, 
+        { pageid: pageId,
+          left: 0.5 * ( minimum.x + maximum.x ),
+          top: 0.5 * ( minimum.y + maximum.y ),
+          layer: Roll20.Objects.OBJECTS,
+          width: maximum.x - minimum.x,
+          height: maximum.y - minimum.y,
+          stroke: color,
+          stroke_width: 2,
+          path: JSON.stringify( path ) } );
+      toFront( circleObject );
+      return circleObject.get( Roll20.Objects.ID );
+    } else {
+      return undefined;
+    }
+  };
+  
   // Create a new circle and return its graphic id
   // circle is in canvas coordinates
-  // circle is created on same pageid as graphic
-  var createCircleGraphic = function( circle, graphic )
+  // circle is created on pageId
+  var createCircleGraphic = function( circle, pageId, color, strokeWidth )
   {
     const radius = circle.radius;
     // Magic 'half' radius here is required to create a circular shape
@@ -239,28 +282,65 @@ var tbdMove = tbdMove || ( function()
       [ 'C', -halfRadius, radius, -radius, halfRadius, -radius, 0 ] ];
     const circleObject = createObj( 
       Roll20.Objects.PATH, 
-      { pageid: graphic.get( Roll20.Objects.PAGEID ),
+      { pageid: pageId,
         left: circle.left,
         top: circle.top,
         width: 2 * radius,
         height: 2 * radius,
         layer: Roll20.Objects.OBJECTS,
-        stroke_width: 2,
+        stroke: color,
+        stroke_width: strokeWidth,
         path: JSON.stringify( path ) } );
     toFront( circleObject );
     return circleObject.get( Roll20.Objects.ID );
   };
 
-  // Add a graphic to the page for the current movement circle
-  // Add the graphic id and circle to mover
-  var addMovementCircle = function( graphic, mover, remainingMovement )
+  // Clear existing graphics for mover
+  // graphic is the Roll20 Object indicated by mover.graphicId and is assume valid
+  // Add new graphics to page to represent mover path and remaining distance
+  // Modifies mover
+  var updateMoverGraphics = function( graphic, mover )
   {
-    const circle = circleOnMap( graphic, remainingMovement );
-    mover.circles.push( circle );
-    if ( circle.radius > 0 ) {
-      mover.circlePathIds.push( createCircleGraphic( canvasCircleFrom( circle, graphic ), graphic ) );
+    clearMoverPaths( mover );
+    const pageId = graphic.get( Roll20.Objects.PAGEID );
+    const lastCircleIndex = mover.circles.length - 1;
+    if ( mover.circles.length > 0 && mover.circles[ lastCircleIndex ].radius > 0.0 ) {
+      const lastCircle = mover.circles[ lastCircleIndex ];
+      const canvasLimitCircle = canvasCircleFrom( lastCircle, pageId );
+      mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, mover.color, 6 ) );
+      canvasLimitCircle.radius += 2;
+      mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, Roll20.Colors.WHITE, 3 ) );
+    }
+    const routePathId = createCirclePathGraphic( 
+      mover.circles.map( function( circle ) { return canvasCircleFrom( circle, pageId ); } ),
+      pageId, 
+      mover.color );
+    if ( routePathId !== undefined ) {
+      mover.circlePathIds.push( routePathId );
     }
   };
+
+  // If graphic has moved or is initially places, add a graphic to the page for the current movement circle
+  // Add the graphic id and circle to mover
+  // Modifies mover
+  var addMovementCircle = function( graphic, mover )
+  {
+    const pageId = graphic.get( Roll20.Objects.PAGEID );
+    const newCircle = circleOnMap( graphic, 0 );
+    if ( mover.circles.length == 0 ) {
+      newCircle.radius = mover.speed;
+      mover.circles.push( newCircle );
+    } else {
+      const lastCircle = mover.circles[ mover.circles.length - 1 ];
+      const dx = newCircle.x - lastCircle.x;
+      const dy = newCircle.y - lastCircle.y;
+      const distance = Math.sqrt( dx * dx + dy * dy );
+      if ( distance > 0.0 ) {
+        newCircle.radius = lastCircle.radius - distance;
+        mover.circles.push( newCircle );
+      }
+    }
+  }
 
   // Set the graphic position given the circle in canvas coordinates
   var setGraphicPosition = function( circle, graphic )
@@ -271,22 +351,21 @@ var tbdMove = tbdMove || ( function()
 
   // Remove the most recent movement circle. Does not remove the start circle.
   // If movement circle removed, move graphic to circle center of most recent entry
+  // Modifies mover
   var undoMovement = function( mover )
   {
     const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
     if ( graphic !== undefined ) {
       if ( mover.circles.length > 1 ) {
         mover.circles.pop();
-        if ( mover.circlePathIds.length > mover.circles.length ) {
-          const circlePathId = mover.circlePathIds.pop();
-          const circleGraphic = getObj( Roll20.Objects.PATH, circlePathId );
-          if ( circleGraphic !== undefined ) {
-            circleGraphic.remove();
-          }
-        }
+        updateMoverGraphics( graphic, mover );
       }
-      const currentCanvasCircle = canvasCircleFrom( mover.circles[ mover.circles.length - 1 ], graphic );
-      setGraphicPosition( currentCanvasCircle, graphic );
+      if ( mover.circles.length > 0 ) {
+        const currentCanvasCircle = canvasCircleFrom( 
+          mover.circles[ mover.circles.length - 1 ], 
+          graphic.get( Roll20.Objects.PAGEID ) );
+        setGraphicPosition( currentCanvasCircle, graphic );
+      }
     }
   };
 
@@ -316,8 +395,19 @@ var tbdMove = tbdMove || ( function()
       ) {
         const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
         if ( maybeCharacter !== undefined ) {
-          const mover = createMover( graphicId, maybeCharacter.id, playerId );
-          addMovementCircle( graphic, mover, mover.speed );
+          const player = getObj( Roll20.Objects.PLAYER, playerId );
+          var color = player === undefined ? Roll20.Colors.BLACK : player.get( Roll20.Objects.COLOR );
+          // -- begin WTF
+          // For whatever reason, Roll20 html color strings from player.get() may have less than 6 number characters following the #
+          // Path graphics do not support stroke attribute with these truncated values
+          // Backfill with 0's
+          while ( color.length < 7 ) {
+            color = color + '0';
+          }
+          // -- end WTF
+          const mover = createMover( graphicId, maybeCharacter.id, playerId, color );
+          addMovementCircle( graphic, mover );
+          updateMoverGraphics( graphic, mover );
           state.tbdMove.movers.push( mover );
         }
       }
