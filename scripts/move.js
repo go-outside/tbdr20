@@ -90,21 +90,39 @@ var tbdMove = tbdMove || ( function()
     return '<div ' + style + ' >' + content + '</div>';
   };
 
+  // Return the remaining travel distance in text or as an input depending on state of mover
+  var travelDistanceForUi = function( mover )
+  {
+    const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' 
+      + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 75px;';
+    const distance = mover.circles[ mover.circles.length - 1 ].radius.toFixed( 0 );
+    const centerStyle = 'style="text-align:center;"';
+    if ( mover.circles.length == 1 ) {
+      return makeDiv( centerStyle, 'Speed: <a ' + anchorStyle2 + '" href="!move speed ?{Speed?|' + distance + '}">' + distance + '</a>' );
+    } else {
+      return makeDiv( centerStyle, 'Remaining: ' + distance );
+    }
+  };
+
   // Show the move control menu
   // playerId is the message.playerid object in a Roll20.Events.CHAT_MESSAGE or it is a mover.playerId
   var showMoveMenu = function( playerId )
   {
     const divStyle = 'style="width: 189px; border: 1px solid black; background-color: #ffffff; padding: 5px;"'
     const tableStyle = 'style="text-align:center;"';
-    const arrowStyle = 'style="border: none; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 195px solid ' + blueColor + '; margin-bottom: 2px; margin-top: 2px;"';
+    const arrowStyle = 'style="border: none; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 195px solid ' 
+      + blueColor + '; margin-bottom: 2px; margin-top: 2px;"';
     const headStyle = 'style="color: ' + blueColor + '; font-size: 18px; text-align: left; font-variant: small-caps; font-family: Times, serif;"';
     const subStyle = 'style="font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;"';
-    const anchorStyle1 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 100px;';
-    const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
+    const anchorStyle1 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' 
+      + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 100px;';
+    const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' 
+      + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
 
     const mover = findMoverByPlayer( playerId );
-    const remaining = mover === undefined ? '' : ( makeDiv( arrowStyle, '' ) + 'Remaining: ' + mover.circles[ mover.circles.length - 1 ].radius.toFixed( 0 ) );
+    const remaining = mover === undefined ? '' : ( makeDiv( arrowStyle, '' ) + travelDistanceForUi( mover ) );
     const undo = mover === undefined || mover.circles.length < 2 ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move undo">Undo</a>' );
+    const clearAll = playerIsGM( playerId ) ?  makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clearall">Clear All</a>' ) : '';
     const menu = makeDiv(
       divStyle,
       makeDiv( headStyle, 'Movement' )
@@ -112,7 +130,8 @@ var tbdMove = tbdMove || ( function()
         + makeDiv( arrowStyle, '' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move start">Start</a>' )
         + undo
-        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' ) );
+        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' )
+        + clearAll );
     const player = getObj( Roll20.Objects.PLAYER, playerId );
     sendChat( Roll20.ANNOUNCER, '/w "' + player.get( Roll20.Objects.DISPLAY_NAME ) + '" ' + menu );
   };
@@ -220,6 +239,22 @@ var tbdMove = tbdMove || ( function()
       state.tbdMove.movers.forEach( function( mover ) { clearMoverPaths( mover ); } );
     }
     state.tbdMove.movers = [];
+  };
+
+  // Clear movers matching the supplied playerId
+  var clearPlayer = function( playerId )
+  {
+    var keepers = [];
+    state.tbdMove.movers.forEach(
+      function( mover )
+      {
+        if ( mover.playerId == playerId ) {
+          clearMoverPaths( mover );
+        } else {
+          keepers.push( mover );
+        }
+      } );
+    state.tbdMove.movers = keepers;
   };
 
   // Return a line path connecting the center of each circle in circles
@@ -414,23 +449,38 @@ var tbdMove = tbdMove || ( function()
     }
   };
 
+  // If playerId controls a mover and that mover has a single move circle, assign the radius for that move circle
+  var maybeSetRemainingRadius = function( playerId, radius )
+  {
+    const mover = findMoverByPlayer( playerId );
+    if ( mover !== undefined || mover.circles.length == 1 ) {
+      mover.circles[ 0 ].radius = Math.max( 0, radius );
+      const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
+      if ( graphic !== undefined ) {
+        updateMoverGraphics( graphic, mover );
+      }
+    }
+  };
+
   // Delegate resolution of chat event
   var handleChatMessage = function( message )
   {
     if ( message.type === 'api' ) {
       const tokens = message.content.split( ' ' );
       const command = tokens[ 0 ];
-      if ( playerIsGM( message.playerid ) ) {
-        // Add clear all graphics option
-      }
       if ( command === '!move' ) {
         if ( tokens.length == 1 ) {
           showMoveMenu( message.playerid );
         } else {
           const subcommand = tokens[ 1 ];
           if ( subcommand == 'clear' ) {
-            clearAll();
+            clearPlayer( message.playerid );
             showMoveMenu( message.playerid );
+          } else if ( subcommand == 'speed' ) {
+            if ( tokens.length == 3 ) {
+              maybeSetRemainingRadius( message.playerid, Number( tokens[ 2 ] ) );
+              showMoveMenu( message.playerid );
+            }
           } else if ( subcommand == 'start' ) {
             if ( message.selected !== undefined && message.selected.length == 1 ) {
               maybeCreateMover( message.playerid, message.selected[ 0 ]._id );
@@ -440,6 +490,12 @@ var tbdMove = tbdMove || ( function()
             const mover = findMoverByPlayer( message.playerid );
             if ( mover !== undefined || mover.circles.length > 1 ) {
               undoMovement( mover );
+              showMoveMenu( message.playerid );
+            }
+          }
+          if ( playerIsGM( message.playerid ) ) {
+            if ( subcommand == 'clearall' ) {
+              clearAll();
               showMoveMenu( message.playerid );
             }
           }
