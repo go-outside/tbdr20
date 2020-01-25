@@ -99,8 +99,12 @@ var tbdMove = tbdMove || ( function()
     const centerStyle = 'style="text-align:center;"';
     if ( mover.circles.length == 1 ) {
       return makeDiv( centerStyle, 'Speed: <a ' + anchorStyle2 + '" href="!move speed ?{Speed?|' + distance + '}">' + distance + '</a>' );
+    } else if ( mover.circles.length > 1 ) {
+      return distance > 0 
+        ? makeDiv( centerStyle, 'Remaining: ' + distance )
+        : makeDiv( centerStyle, 'Total Distance: ' + ( mover.circles[ 0 ].radius - distance ) )
     } else {
-      return makeDiv( centerStyle, 'Remaining: ' + distance );
+      return '';
     }
   };
 
