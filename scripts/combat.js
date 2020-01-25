@@ -111,27 +111,28 @@ var tbdCombat = tbdCombat || ( function()
 
   // Note that two word condition names will require rework for resolution of api command
   var conditions = [];
+  conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'fluffy-wing' ) );
+  conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'frozen-orb' ) );
+  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
+  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', true ) );
   conditions.push( createCondition( 'Charmed', ' has been charmed.', ' is thinking clearly again.', 'half-heart' ) );
   conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'broken-skull' ) );
   conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
   conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'screaming' ) );
-  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'snail' ) );
+  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'fist' ) );
   conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'back-pain' ) );
   conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'ninja-mask' ) );
-  conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'frozen-orb' ) );
-  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'archery-target' ) );
+  conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'aura' ) );
+  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'pummeled' ) );
   conditions.push( createCondition( 'Poisoned', ' is poisoned.', ' is no longer poisoned.', 'radioactive' ) );
   conditions.push( createCondition( 'Prone', ' is prone.', ' is no longer prone.', 'arrowed' ) );
-  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', 'aura' ) );
+  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', 'interdiction' ) );
   conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', 'broken-shield' ) );
   conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'half-haze' ) );
   conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'chemical-bolt' ) );
   conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'cobweb' ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
-  conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'fluffy-wing' ) );
-  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
-  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', true ) );
 
   // Return the condition matching name. Return undefined if not found
   var findCondition = function( conditionName )
