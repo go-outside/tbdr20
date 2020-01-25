@@ -27,7 +27,9 @@ var tbdCombat = tbdCombat || ( function()
   Roll20.Objects = {
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
+    GM_LAYER : 'gmlayer',
     GRAPHIC : 'graphic',
+    LAYER : 'layer',
     MACRO : 'macro',
     NAME : 'name',
     PATH : 'path',
@@ -246,12 +248,16 @@ var tbdCombat = tbdCombat || ( function()
   // Notify chat of participant turn
   var announceTurn = function( participant )
   {
-    var tokenName = participant.custom;
-    if ( tokenName === undefined ) {
-      const graphic = getObj( Roll20.Objects.GRAPHIC, participant.id );
-      tokenName = graphic === undefined ? 'Illegal Turn' : graphic.get( Roll20.Objects.NAME );
+    const graphic = getObj( Roll20.Objects.GRAPHIC, participant.id );
+    if ( graphic !== undefined ) {
+      const tokenName = graphic === undefined ? 'Illegal Turn' : graphic.get( Roll20.Objects.NAME );
+      if ( graphic.get( Roll20.Objects.LAYER ) == Roll20.Objects.GM_LAYER ) {
+        sendChat( Roll20.ANNOUNCER, '/w gm ' + tokenName + ' has the initiative.' );
+      } else {
+        sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
+      }
+        
     }
-    sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
   };
 
   // Check to see if the round has started
