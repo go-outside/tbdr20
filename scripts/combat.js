@@ -319,18 +319,9 @@ var tbdCombat = tbdCombat || ( function()
         const condition = findCondition( record.conditionName );
         if ( condition !== undefined ) {
           if ( condition.perRound == true ) {
-            // Check to see that roll object is still defined -- it may have been removed
-            const rollObject = getObj( Roll20.Objects.GRAPHIC, record.graphicId );
-            if ( rollObject !== undefined ) {
-              const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
-              if ( maybeCharacter !== undefined ) {
-                sendConditionRecoveredMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
-              }
-              // Remove the graphical status marker
-              rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
-            } else {
-              keepers.push( record );
-            }
+            purgeConditionRecord( record );
+          } else {
+            keepers.push( record );
           }
         }
       } );
