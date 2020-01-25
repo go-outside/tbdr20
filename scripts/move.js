@@ -419,7 +419,7 @@ var tbdMove = tbdMove || ( function()
       function( mover )
       {
         if ( mover.playerId == playerId ) {
-          clearMoverCircleGraphics( mover );
+          clearMoverPaths( mover );
         } else {
           state.tbdMove.movers.push( mover );
         }
