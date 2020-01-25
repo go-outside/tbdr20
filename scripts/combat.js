@@ -98,9 +98,15 @@ var tbdCombat = tbdCombat || ( function()
     'archery-target' ];
   
   // Create a new condition with normalized object parameters
-  var createCondition = function( name, contract, recover, marker )
+  // boolean perRound is true for conditions the are cleared at the top of a combat round
+  var createCondition = function( name, contract, recover, marker, perRound )
   {
-    return { name: name, contract: contract, recover: recover, marker: marker };
+    return { 
+      name: name, 
+      contract: contract, 
+      recover: recover, 
+      marker: marker,
+      perRound: perRound === undefined ? false : perRound };
   }
 
   // Note that two word condition names will require rework for resolution of api command
@@ -125,7 +131,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
   conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'fluffy-wing' ) );
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
-  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix' ) );
+  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', true ) );
 
   // Return the condition matching name. Return undefined if not found
   var findCondition = function( conditionName )
@@ -295,6 +301,35 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
+  // Remove any condition records in state.tbdCombat.records with perRound true
+  // Update those status markers and send recovery message
+  var purgePerRoundConditions = function()
+  {
+    const keepers = [];
+    state.tbdCombat.records.forEach(
+      function( record )
+      {
+        const condition = findCondition( record.conditionName );
+        if ( condition !== undefined ) {
+          if ( condition.perRound == true ) {
+            // Check to see that roll object is still defined -- it may have been removed
+            const rollObject = getObj( Roll20.Objects.GRAPHIC, record.graphicId );
+            if ( rollObject !== undefined ) {
+              const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+              if ( maybeCharacter !== undefined ) {
+                sendConditionRecoveredMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
+              }
+              // Remove the graphical status marker
+              rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
+            } else {
+              keepers.push( record );
+            }
+          }
+        }
+      } );
+    state.tbdCombat.records = keepers;
+  };
+
   // Remove all entries from the Campaign 'turnorder'
   var clearAll = function()
   {
@@ -360,7 +395,7 @@ var tbdCombat = tbdCombat || ( function()
     while ( recordIndex < records.length ) {
       const record = records[ recordIndex ];
       // Adjust only records matching the participant
-      if ( participant.id == record.graphicId ) {
+      if ( participant.id == record.graphicId && record.perRound == false ) {
         record.duration -= 1;
         if ( record.duration <= 0 ) {
           purgeConditionRecord( record );
@@ -575,6 +610,7 @@ var tbdCombat = tbdCombat || ( function()
   var endRound = function()
   {
     sendChat( Roll20.ANNOUNCER, '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
+    purgePerRoundConditions();
     // Set the turn to zero to indicate round is complete
     state.tbdCombat.turn = 0;
     showCombatMenu();
