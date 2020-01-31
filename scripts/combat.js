@@ -99,16 +99,22 @@ var tbdCombat = tbdCombat || ( function()
     'angel-outfit', 
     'archery-target' ];
   
+  const WhenToAdvanceCondition = {
+    AFTER_TURN : 'afterTurn',
+    BEFORE_TURN : 'beforeTurn' };
+
   // Create a new condition with normalized object parameters
   // boolean perRound is true for conditions the are cleared at the top of a combat round
-  var createCondition = function( name, contract, recover, marker, perRound )
+  // whenToAdvance is an element of WhenToAdvanceCondition
+  // whenToAdvance specifies when the condition duration decrements. Default values is AFTER_TURN
+  var createCondition = function( name, contract, recover, marker, whenToAdvance )
   {
     return { 
       name: name, 
       contract: contract, 
       recover: recover, 
       marker: marker,
-      perRound: perRound === undefined ? false : perRound };
+      whenToAdvance: whenToAdvance === undefined ? WhenToAdvanceCondition.AFTER_TURN : whenToAdvance };
   }
 
   // Note that two word condition names will require rework for resolution of api command
@@ -116,7 +122,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'fluffy-wing' ) );
   conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'frozen-orb' ) );
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
-  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', true ) );
+  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );
   conditions.push( createCondition( 'Charmed', ' has been charmed.', ' is thinking clearly again.', 'half-heart' ) );
   conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'broken-skull' ) );
   conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
@@ -308,26 +314,6 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
-  // Remove any condition records in state.tbdCombat.records with perRound true
-  // Update those status markers and send recovery message
-  var purgePerRoundConditions = function()
-  {
-    const keepers = [];
-    state.tbdCombat.records.forEach(
-      function( record )
-      {
-        const condition = findCondition( record.conditionName );
-        if ( condition !== undefined ) {
-          if ( condition.perRound == true ) {
-            purgeConditionRecord( record );
-          } else {
-            keepers.push( record );
-          }
-        }
-      } );
-    state.tbdCombat.records = keepers;
-  };
-
   // Remove all entries from the Campaign 'turnorder'
   var clearAll = function()
   {
@@ -387,13 +373,15 @@ var tbdCombat = tbdCombat || ( function()
 
   // Reduce duration count for condition records applying to participant
   // If a record is reduced to zero duration, send recovery message and remove from records
-  var progressConditionRecord = function( participant, records )
+  // whenToAdvance is one of WhenToAdvanceCondition enum
+  var progressConditionRecord = function( participant, records, whenToAdvance )
   {
     var recordIndex = 0;
     while ( recordIndex < records.length ) {
       const record = records[ recordIndex ];
+      const condition = findCondition( record.conditionName );
       // Adjust only records matching the participant
-      if ( participant.id == record.graphicId && record.perRound == false ) {
+      if ( condition !== undefined && participant.id == record.graphicId && condition.whenToAdvance == whenToAdvance ) {
         record.duration -= 1;
         if ( record.duration <= 0 ) {
           purgeConditionRecord( record );
@@ -593,6 +581,7 @@ var tbdCombat = tbdCombat || ( function()
         state.tbdCombat.turn++;
         state.tbdCombat.round++;
         sendChat( '', '/desc Start of Round ' + state.tbdCombat.round );
+        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu();
         announceTurn( turnOrder[ 0 ] );
       } else {
@@ -608,7 +597,6 @@ var tbdCombat = tbdCombat || ( function()
   var endRound = function()
   {
     sendChat( Roll20.ANNOUNCER, '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
-    purgePerRoundConditions();
     // Set the turn to zero to indicate round is complete
     state.tbdCombat.turn = 0;
     showCombatMenu();
@@ -625,7 +613,7 @@ var tbdCombat = tbdCombat || ( function()
       if ( turnOrder[ 0 ].tookTurn == false ) {
         // Advance condition state only for participants who have not completed their turn yet
         // Ideally tookTurn will always be false at this point because other logic prevents advance on a stale turn
-        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records );
+        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.AFTER_TURN );
       }
       // Mark turn taken for first combatant and resort the order
       if ( turnOrder.length > 0 ) {
@@ -639,6 +627,7 @@ var tbdCombat = tbdCombat || ( function()
       if ( roundComplete( turnOrder ) ) {
         endRound();
       } else {
+        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu();
         announceTurn( turnOrder[ 0 ] );
         state.tbdCombat.turn++;
@@ -784,7 +773,6 @@ var tbdCombat = tbdCombat || ( function()
     if ( state.tbdCombat.conditionCount === undefined ) {
       state.tbdCombat.conditionCount = 0;
     }
-    clearAll();
 
     on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
     on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
