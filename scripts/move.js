@@ -62,6 +62,11 @@ var tbdMove = tbdMove || ( function()
     REPRESENTS : 'represents'
   };
 
+  const Terrain = {
+    DIFFICULT : 'Difficult',
+    NORMAL : 'Normal'
+  };
+
   // Return a new mover object
   var createMover = function( graphicId, characterId, playerId, color )
   {
@@ -75,7 +80,15 @@ var tbdMove = tbdMove || ( function()
       // An array of path ids for decorations placed on page
       circlePathIds: [],
       // Assigns base color for movement graphics
-      color: color };
+      color: color,
+      // Assign modifier for movement terrain types
+      terrain: Terrain.NORMAL };
+  };
+
+  // Return the distance multiplier for the given mover
+  var distanceMultiplierForTerrain = function( mover )
+  {
+    return mover.terrain == Terrain.NORMAL ? 1 : 2;
   };
 
   // Return the mover associated with playerId
@@ -126,6 +139,7 @@ var tbdMove = tbdMove || ( function()
     const mover = findMoverByPlayer( playerId );
     const remaining = mover === undefined ? '' : ( makeDiv( arrowStyle, '' ) + travelDistanceForUi( mover ) );
     const dash = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move dash">Dash</a>' );
+    const terrain = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move terrain">' + mover.terrain + ' Terrain</a>' );
     const start = mover === undefined ? makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move start">Start</a>' ) : '';
     const undo = mover === undefined || mover.circles.length < 2 ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move undo">Undo</a>' );
     const clear = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' );
@@ -136,6 +150,7 @@ var tbdMove = tbdMove || ( function()
       divStyle,
       makeDiv( headStyle, 'Movement' )
         + remaining
+        + terrain
         + makeDiv( arrowStyle, '' )
         + dash
         + start
@@ -379,7 +394,7 @@ var tbdMove = tbdMove || ( function()
       const lastCircle = mover.circles[ mover.circles.length - 1 ];
       const dx = newCircle.x - lastCircle.x;
       const dy = newCircle.y - lastCircle.y;
-      const distance = Math.sqrt( dx * dx + dy * dy );
+      const distance = distanceMultiplierForTerrain( mover ) * Math.sqrt( dx * dx + dy * dy );
       if ( distance > 0.0 ) {
         newCircle.radius = lastCircle.radius - distance;
         mover.circles.push( newCircle );
@@ -425,6 +440,12 @@ var tbdMove = tbdMove || ( function()
         setGraphicPosition( currentCanvasCircle, graphic );
       }
     }
+  };
+
+  // Toggle the setting for mover.terrain between Terrain.NORMAL and Terrain.DIFFICULT
+  var toggleTerrainModifier = function( mover )
+  {
+    mover.terrain = mover.terrain == Terrain.NORMAL ? Terrain.DIFFICULT : Terrain.NORMAL;
   };
 
   // Create a new mover if graphic and player are a valid combination
@@ -510,6 +531,12 @@ var tbdMove = tbdMove || ( function()
           } else if ( subcommand == 'start' ) {
             if ( message.selected !== undefined && message.selected.length == 1 ) {
               maybeCreateMover( message.playerid, message.selected[ 0 ]._id );
+              showMoveMenu( message.playerid );
+            }
+          } else if ( subcommand == 'terrain' ) {
+            const mover = findMoverByPlayer( message.playerid );
+            if ( mover !== undefined ) {
+              toggleTerrainModifier( mover );
               showMoveMenu( message.playerid );
             }
           } else if ( subcommand == 'dash' ) {
