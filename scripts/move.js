@@ -367,6 +367,7 @@ var tbdMove = tbdMove || ( function()
     if ( mover.circles.length > 0 && mover.circles[ lastCircleIndex ].radius > 0.0 ) {
       const lastCircle = mover.circles[ lastCircleIndex ];
       const canvasLimitCircle = canvasCircleFrom( lastCircle, pageId );
+      canvasLimitCircle.radius /= distanceMultiplierForTerrain( mover );
       mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, mover.color, 6 ) );
       canvasLimitCircle.radius += 2;
       mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, Roll20.Colors.WHITE, 3 ) );
@@ -385,19 +386,31 @@ var tbdMove = tbdMove || ( function()
   // Modifies mover
   var addMovementCircle = function( graphic, mover )
   {
-    const pageId = graphic.get( Roll20.Objects.PAGEID );
     const newCircle = circleOnMapAtGraphic( graphic, 0 );
     if ( mover.circles.length == 0 ) {
       newCircle.radius = mover.speed;
       mover.circles.push( newCircle );
     } else {
       const lastCircle = mover.circles[ mover.circles.length - 1 ];
-      const dx = newCircle.x - lastCircle.x;
-      const dy = newCircle.y - lastCircle.y;
-      const distance = distanceMultiplierForTerrain( mover ) * Math.sqrt( dx * dx + dy * dy );
-      if ( distance > 0.0 ) {
-        newCircle.radius = lastCircle.radius - distance;
-        mover.circles.push( newCircle );
+      if ( lastCircle.radius > 0.0 ) {
+        // Allow for movement up to the radius of the last circle
+        const dx = newCircle.x - lastCircle.x;
+        const dy = newCircle.y - lastCircle.y;
+        const distance = Math.sqrt( dx * dx + dy * dy );
+        if ( distance > 0.0 ) {
+          const terrainMultiplier = distanceMultiplierForTerrain( mover );
+          const maximumDistance = lastCircle.radius / terrainMultiplier;
+          const permittedDistance = Math.min( distance, maximumDistance );
+          // Adjust newCircle to fit permittedDistance
+          newCircle.radius = lastCircle.radius - terrainMultiplier * permittedDistance;
+          newCircle.x = lastCircle.x + permittedDistance * dx / distance;
+          newCircle.y = lastCircle.y + permittedDistance * dy / distance;
+          mover.circles.push( newCircle );
+        }
+      } else {
+        // Otherwise move token to prior legal position
+        const priorLegalCanvasCircle = canvasCircleFrom( lastCircle, graphic.get( Roll20.Objects.PAGEID ) );
+        setGraphicPosition( priorLegalCanvasCircle, graphic );
       }
     }
   }
@@ -445,7 +458,11 @@ var tbdMove = tbdMove || ( function()
   // Toggle the setting for mover.terrain between Terrain.NORMAL and Terrain.DIFFICULT
   var toggleTerrainModifier = function( mover )
   {
-    mover.terrain = mover.terrain == Terrain.NORMAL ? Terrain.DIFFICULT : Terrain.NORMAL;
+    const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
+    if ( graphic !== undefined ) {
+      mover.terrain = mover.terrain == Terrain.NORMAL ? Terrain.DIFFICULT : Terrain.NORMAL;
+      updateMoverGraphics( graphic, mover );
+    }
   };
 
   // Create a new mover if graphic and player are a valid combination
