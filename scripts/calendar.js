@@ -34,8 +34,8 @@ var tbdCalendar = tbdCalendar || ( function()
   var currentDate = function()
   {
     var date = createDate();
-    if ( state.tbdCalendar !== undefined ) {
-      copyDate( state.tbdCalendar, date );
+    if ( state.tbdCalendar !== undefined && state.tbdCalendar.date !== undefined ) {
+      copyDate( state.tbdCalendar.date, date );
     }
     return date;
   };
@@ -45,9 +45,48 @@ var tbdCalendar = tbdCalendar || ( function()
   var storeDate = function( date )
   {
     if ( state.tbdCalendar === undefined ) {
-      state.tbdCalendar = createDate();
+      state.tbdCalendar = {};
     }
-    copyDate( date, state.tbdCalendar );
+    state.tbdCalendar.date = createDate();
+    copyDate( date, state.tbdCalendar.date );
+  };
+
+  // Create a new tbd effect object
+  // description is a user readable string
+  // expiration is a date value
+  var createEffect = function( description, expiration )
+  {
+    return {
+      description: description,
+      expiration: expiration };
+  };
+
+  // Write contents of source date to destination date
+  // source and destination are objects constructed by createDate
+  var copyEffect = function( source, destination )
+  {
+    destination.description = source.description;
+    destination.expiration = source.expiration;
+  };
+
+  // Return a copy of the current stored effects array
+  // If no effects are stored, return an empty array
+  var currentEffects = function()
+  {
+    const effects = state.tbdCalendar !== undefined && state.tbdCalendar.effects instanceof Array
+      ? state.tbdCalendar.effects
+      : [];
+    // Deep copy the effects array
+    return effects.map( effect => createEffect( effect.description, effect.expiration ) );
+  };
+
+  // Deep copy effects array into state.tbdCalendar.effects
+  var storeEffects = function( effects )
+  {
+    if ( state.tbdCalendar === undefined ) {
+      state.tbdCalendar = {};
+    }
+    state.tbdCalendar.effects = effects.map( effect => createEffect( effect.description, effect.expiration ) );
   };
 
   // Return the duration of each Faerun month / festival for the specified year
@@ -464,6 +503,13 @@ var tbdCalendar = tbdCalendar || ( function()
 
   var registerEventHandlers = function()
   {
+    // Check for old calendar state
+    if ( state.tbdCalendar !== undefined && state.tbdCalendar.date === undefined ) {
+      const oldDate = state.tbdCalendar;
+      state.tbdCalendar = undefined;
+      state.tbdCalendar = { date: oldDate };
+    }
+
     on( 'chat:message', handleChatMessage );
     log( 'There be dragons! Calendar initialized.' );
   };
