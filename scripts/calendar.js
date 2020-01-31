@@ -51,22 +51,41 @@ var tbdCalendar = tbdCalendar || ( function()
     copyDate( date, state.tbdCalendar.date );
   };
 
+  const EffectVisibility = {
+    GM : 'GM',
+    PUBLIC : 'Public'
+  };
+
   // Create a new tbd effect object
   // description is a user readable string
   // expiration is a date value
-  var createEffect = function( description, expiration )
+  // visbility is one of EffectVisibility.GM or PUBLIC
+  var createEffect = function( description, expiration, visibility )
   {
+    if ( state.tbdCalendar === undefined ) {
+      state.tbdCalendar = {};
+    }
+    if ( state.tbdCalendar.effectCount === undefined )
+    {
+      state.tbdCalendar.effectCount = 0;
+    }
+    // Each effect needs a unique id for delete function
+    const effectId = ++state.tbdCalendar.effectCount;
     return {
+      id: effectId,
       description: description,
-      expiration: expiration };
+      expiration: expiration,
+      visibility: visibility };
   };
 
   // Write contents of source date to destination date
   // source and destination are objects constructed by createDate
   var copyEffect = function( source, destination )
   {
+    destination.id = source.id;
     destination.description = source.description;
     destination.expiration = source.expiration;
+    destination.visibility = source.visibility;
   };
 
   // Return a copy of the current stored effects array
@@ -77,16 +96,32 @@ var tbdCalendar = tbdCalendar || ( function()
       ? state.tbdCalendar.effects
       : [];
     // Deep copy the effects array
-    return effects.map( effect => createEffect( effect.description, effect.expiration ) );
+    return effects.map( 
+      function( effect )
+      {
+        const copy = {};
+        copyEffect( effect, copy );
+        return copy;
+      } );
   };
 
   // Deep copy effects array into state.tbdCalendar.effects
+  // If the stored effects size is zero, set state.tbdCalendar.effectCount to zero
   var storeEffects = function( effects )
   {
     if ( state.tbdCalendar === undefined ) {
       state.tbdCalendar = {};
     }
-    state.tbdCalendar.effects = effects.map( effect => createEffect( effect.description, effect.expiration ) );
+    state.tbdCalendar.effects = effects.map( 
+      function( effect )
+      {
+        const copy = {};
+        copyEffect( effect, copy );
+        return copy;
+      } );
+    if ( state.tbdCalendar.effects.length == 0 ) {
+      state.tbdCalendar.effectCount = 0;
+    }
   };
 
   // Return the duration of each Faerun month / festival for the specified year
@@ -302,6 +337,31 @@ var tbdCalendar = tbdCalendar || ( function()
     return temperatures[ season ][ temperatureIndex ] + ' ' + windLevels[ windIndex ] + precipitation[ season ][ precipitationIndex ];
   };
 
+
+  // Return html string to represent a effect record in the effects table
+  // Contains description, duration, and if player is gm includes delete button in a table row
+  var effectsTableRow = function( effect, playerIsGm )
+  {
+    if ( playerIsGm || effect.visibility == EffectVisibility.PUBLIC ) {
+      const anchorStyle = 'style="border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + redColor + '; border-radius: 4px; box-shadow: 1px 1px 1px #707070;"';
+      const baseRow = '<td>' + effect.description + '</td><td>need duration ' + String( effect.expiration ) + '</td>';
+      const gmContent = playerIsGm ? ( '<td><a ' + anchorStyle + ' href="!fcremoveeffect ' + String( effect.id ) + '"><b>X</b></a></td></tr>' ) : '';
+      return '<tr>' + baseRow + gmContent + '</tr>';
+    }
+    return '';
+  };
+
+  // Return an html table for the list of effects
+  // Return an empty string if there are no visible effects
+  var effectsTable = function( effects, playerIsGm )
+  {
+    var content = '';
+    effects.forEach( function( effect ) { content = content + effectsTableRow( effect, playerIsGm ); } );
+    return content.length > 0
+      ? ( '<table style=\'margin-left:auto; margin-right:auto; font-size: 12px; width: 200px\'>' + content + '</table>' )
+      : '';
+  };
+
   // Return an html entry describing the moon state for a particular dateValue
   var moonEntry = function( dateValue )
   {
@@ -323,6 +383,11 @@ var tbdCalendar = tbdCalendar || ( function()
     const subStyle = 'style="font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;"';
     const readableStrings = humanStrings( current.value );
 
+    const effectsTableContent = effectsTable( currentEffects(), false );
+    const effectsEntry = effectsTableContent.length == 0 
+      ? ''
+      : ( makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Effects' ) + effectsTableContent );
+
     sendChat( 
       'the 8-ball', 
       makeDiv( 
@@ -334,7 +399,8 @@ var tbdCalendar = tbdCalendar || ( function()
           + '<br>The time is: ' + readableStrings.time 
           + '<br>Next Long Rest: ' + longRestAvailability( current )
           + '<br>' + moonEntry( current.value )
-          + '<br>' + current.weather ) );
+          + '<br>' + current.weather ),
+          + effectsEntry );
   };
 
   // Return a string describing availability of once per day long rest
@@ -366,6 +432,11 @@ var tbdCalendar = tbdCalendar || ( function()
     return 'Since Hammer 1st, 1486';
   };
 
+  var addEffectInput = function()
+  {
+    return '?{Duration|1 hour},?{Visibility|' + EffectVisibility.GM + '|' + EffectVisibility.PUBLIC + '},?{Description|Add description}';
+  }
+
   var showCalendarInterface = function( message )
   {
     const current = currentDate();
@@ -378,6 +449,12 @@ var tbdCalendar = tbdCalendar || ( function()
     const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + redColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
     const readableDate = interpretDate( current.value );
     const timeString = humanTimeString( readableDate.hours, readableDate.minutes );
+
+    const effectsTableContent = effectsTable( currentEffects(), true );
+    const effectsEntry = effectsTableContent.length == 0 
+      ? ''
+      : ( makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Effects' ) + effectsTableContent );
+
     const menu = makeDiv(
       divStyle,
       makeDiv( headStyle, 'Calendar' )
@@ -397,8 +474,51 @@ var tbdCalendar = tbdCalendar || ( function()
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcrest">Long Rest Finished</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcadd10minutes">Add 10 minutes</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddhour">Add an hour</a>' )
-        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcshare">Share Calendar</a>' ) );
+        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcshare">Share Calendar</a>' ) 
+        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddeffect,' + addEffectInput() + '">Add Effect</a>' ) 
+        + effectsEntry );
     sendChat( 'the 8-ball', '/w gm ' + menu );
+  };
+
+  // Convert string input to a time in minutes
+  var extractDuration = function( rawDuration )
+  {
+    const match = rawDuration.match( /\s*([0-9]+\.?[0-9]*)\s*([a-zA-z]+)/ );
+    if ( match.length == 3 ) {
+      return Number( match[ 1 ] );
+    } else {
+      return -1;
+    }
+  };
+
+
+  // Add an effect to the current list of effects
+  // tokens are the input tokens parsed from chat
+  // First token is assumed to be !fcaddeffect and is ignored here
+  var addEffect = function( tokens )
+  {
+    if ( tokens.length > 3 ) {
+      // duration cannot have commas for this to work
+      const duration = extractDuration( tokens[ 1 ] );
+      const visibility = tokens[ 2 ];
+      // Allow the description to have commas by joining them back in at the end
+      const description = tokens.slice( 3 ).join( ',' );
+      if ( duration > 0 && ( visibility == EffectVisibility.GM || visibility == EffectVisibility.PUBLIC ) ) {
+        // Inputs are valid. Add effect
+        const date = currentDate();
+        const effects = currentEffects();
+        effects.push( createEffect( description, date.value + duration, visibility ) );
+        storeEffects( effects );
+      } else {
+        sendChat( 'the 8-ball', '/w gm Invalid effect. Duration must be a number followed by units.' );
+      }
+    }
+  };
+
+  // Remove any effect with id matching effectId
+  var removeEffect = function( effectId )
+  {
+    storeEffects( currentEffects().filter( effect => effect.id != effectId ) );
   };
 
   var setDay = function( dayString )
@@ -495,6 +615,12 @@ var tbdCalendar = tbdCalendar || ( function()
           showCalendarInterface( message );
         } else if ( command === '!fcyear' && tokens.length > 1 ) {
           setYear( tokens[ 1 ] );
+          showCalendarInterface( message );
+        } else if ( command === '!fcaddeffect' && tokens.length > 1 ) {
+          addEffect( tokens );
+          showCalendarInterface( message );
+        } else if ( command === '!fcremoveeffect' && tokens.length > 1 ) {
+          removeEffect( Number( tokens[ 1 ] ) );
           showCalendarInterface( message );
         }
       } else if ( command === '!fc' ) {
