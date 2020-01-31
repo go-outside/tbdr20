@@ -70,7 +70,7 @@ var tbdMove = tbdMove || ( function()
       characterId: characterId, 
       playerId: playerId,
       speed: characterSpeed( characterId ), 
-      // An array of map circles generated from circleOnMap
+      // An array of map circles generated from circleOnMapAtGraphic
       circles: [], 
       // An array of path ids for decorations placed on page
       circlePathIds: [],
@@ -125,16 +125,22 @@ var tbdMove = tbdMove || ( function()
 
     const mover = findMoverByPlayer( playerId );
     const remaining = mover === undefined ? '' : ( makeDiv( arrowStyle, '' ) + travelDistanceForUi( mover ) );
+    const dash = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move dash">Dash</a>' );
+    const start = mover === undefined ? makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move start">Start</a>' ) : '';
     const undo = mover === undefined || mover.circles.length < 2 ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move undo">Undo</a>' );
-    const clearAll = playerIsGM( playerId ) ?  makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clearall">Clear All</a>' ) : '';
+    const clear = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' );
+    const clearAll = playerIsGM( playerId ) 
+      ? ( makeDiv( arrowStyle, '' ) + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clearall">Clear All</a>' ) )
+      : '';
     const menu = makeDiv(
       divStyle,
       makeDiv( headStyle, 'Movement' )
         + remaining
         + makeDiv( arrowStyle, '' )
-        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move start">Start</a>' )
+        + dash
+        + start
         + undo
-        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' )
+        + clear
         + clearAll );
     const player = getObj( Roll20.Objects.PLAYER, playerId );
     sendChat( Roll20.ANNOUNCER, '/w "' + player.get( Roll20.Objects.DISPLAY_NAME ) + '" ' + menu );
@@ -195,7 +201,7 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Provides a position for a Roll20 graphic object
-  var circleOnMap = function( graphic, mapRadius )
+  var circleOnMapAtGraphic = function( graphic, mapRadius )
   {
     const page = getObj( Roll20.Objects.PAGE, graphic.get( Roll20.Objects.PAGEID ) );
     const scale = page.get( Roll20.Objects.SCALE_NUMBER ) / Roll20.DistanceUnit;
@@ -265,7 +271,7 @@ var tbdMove = tbdMove || ( function()
   // Return undefined if circles has size less than two
   // circles are in canvas coordinates
   // path is created on pageId
-  var createCirclePathGraphic = function( circles, pageId, color )
+  var createTrailGraphic = function( circles, pageId, color )
   {
     if ( circles.length > 1 ) {
       const firstCircle = circles[ 0 ];
@@ -296,7 +302,7 @@ var tbdMove = tbdMove || ( function()
           width: maximum.x - minimum.x,
           height: maximum.y - minimum.y,
           stroke: color,
-          stroke_width: 2,
+          stroke_width: 4,
           path: JSON.stringify( path ) } );
       toFront( circleObject );
       return circleObject.get( Roll20.Objects.ID );
@@ -350,7 +356,7 @@ var tbdMove = tbdMove || ( function()
       canvasLimitCircle.radius += 2;
       mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, Roll20.Colors.WHITE, 3 ) );
     }
-    const routePathId = createCirclePathGraphic( 
+    const routePathId = createTrailGraphic( 
       mover.circles.map( function( circle ) { return canvasCircleFrom( circle, pageId ); } ),
       pageId, 
       mover.color );
@@ -365,7 +371,7 @@ var tbdMove = tbdMove || ( function()
   var addMovementCircle = function( graphic, mover )
   {
     const pageId = graphic.get( Roll20.Objects.PAGEID );
-    const newCircle = circleOnMap( graphic, 0 );
+    const newCircle = circleOnMapAtGraphic( graphic, 0 );
     if ( mover.circles.length == 0 ) {
       newCircle.radius = mover.speed;
       mover.circles.push( newCircle );
@@ -386,6 +392,19 @@ var tbdMove = tbdMove || ( function()
   {
     graphic.set( Roll20.Objects.TOP, circle.top );
     graphic.set( Roll20.Objects.LEFT, circle.left );
+  };
+
+  // Add a new circle to the list having radius of last plus mover speed
+  var addDash = function( mover )
+  {
+    const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
+    if ( graphic !== undefined ) {
+      if ( mover.circles.length > 0 ) {
+        const newCircle = circleOnMapAtGraphic( graphic, mover.circles[ mover.circles.length - 1 ].radius + mover.speed );
+        mover.circles.push( newCircle );
+        updateMoverGraphics( graphic, mover );
+      }
+    }
   };
 
   // Remove the most recent movement circle. Does not remove the start circle.
@@ -458,9 +477,12 @@ var tbdMove = tbdMove || ( function()
   {
     const mover = findMoverByPlayer( playerId );
     if ( mover !== undefined || mover.circles.length == 1 ) {
-      mover.circles[ 0 ].radius = Math.max( 0, radius );
       const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
       if ( graphic !== undefined ) {
+        mover.speed = Math.max( 0, radius );
+        mover.circles = [];
+        addMovementCircle( graphic, mover );
+        mover.circles[ 0 ].radius = mover.speed;
         updateMoverGraphics( graphic, mover );
       }
     }
@@ -488,6 +510,12 @@ var tbdMove = tbdMove || ( function()
           } else if ( subcommand == 'start' ) {
             if ( message.selected !== undefined && message.selected.length == 1 ) {
               maybeCreateMover( message.playerid, message.selected[ 0 ]._id );
+              showMoveMenu( message.playerid );
+            }
+          } else if ( subcommand == 'dash' ) {
+            const mover = findMoverByPlayer( message.playerid );
+            if ( mover !== undefined || mover.circles.length >= 1 ) {
+              addDash( mover );
               showMoveMenu( message.playerid );
             }
           } else if ( subcommand == 'undo' ) {
