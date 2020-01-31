@@ -115,10 +115,10 @@ var tbdCalendar = tbdCalendar || ( function()
   }
 
   // Return the year of the date and the numbered day of the year 0 - 365
-  // date is an object constructed by createDate
-  var yearAndDayFromDate = function( date )
+  // dateValue is the value member from an object constructed by createDate
+  var yearAndDayFromDate = function( dateValue )
   {
-    const days = Math.floor( date.value / minutesPerDay );
+    const days = Math.floor( dateValue / minutesPerDay );
     // 365 x 3 + 366 days every 4 years
     const daysPerFourYears = 365 * 3 + 366;
     const fourYearPeriods = Math.floor( days / daysPerFourYears );
@@ -161,10 +161,11 @@ var tbdCalendar = tbdCalendar || ( function()
     return value;
   };
 
-  // Return human readable values describing the date
-  var interpretDate = function( date )
+  // Return human readable values describing the dateValue
+  // dateValue is the value member of createDate
+  var interpretDate = function( dateValue )
   {
-    const yearAndDay = yearAndDayFromDate( date );
+    const yearAndDay = yearAndDayFromDate( dateValue );
     // Track a value to be decremented in a loop over months
     var dayOffset = yearAndDay.day;
     var month = '';
@@ -181,7 +182,7 @@ var tbdCalendar = tbdCalendar || ( function()
         }
         dayOffset -= entry.duration;
       } );
-    const timeInMinutes = Math.floor( date.value % minutesPerDay );
+    const timeInMinutes = Math.floor( dateValue % minutesPerDay );
     return {
       year: yearAndDay.year,
       month: month,
@@ -224,9 +225,10 @@ var tbdCalendar = tbdCalendar || ( function()
     }
   };
 
-  var humanStrings = function( date )
+  // dateValue is the value member of createDate()
+  var humanStrings = function( dateValue )
   {
-    const piecewiseDate = interpretDate( date );
+    const piecewiseDate = interpretDate( dateValue );
     const dateDay = piecewiseDate.festival
       ? 'Festival'
       : piecewiseDate.day + daySuffix( piecewiseDate.day );
@@ -236,12 +238,13 @@ var tbdCalendar = tbdCalendar || ( function()
   };
 
   // Return the state of the moon and supporting data
-  var moonState = function( date )
+  // dateValue is the value member from a createDate object
+  var moonState = function( dateValue )
   {
     // Assume moon orbits Faerun 48 times over four years
     // 365 x 3 + 366 days every 4 years
     const daysPerMoonOrbit = ( 365 * 3 + 366 ) / 48;
-    const rawDays = date.value / minutesPerDay;
+    const rawDays = dateValue / minutesPerDay;
     // orbitFraction is a value between 0 and 1
     const orbitFraction = rawDays / daysPerMoonOrbit - Math.floor( rawDays / daysPerMoonOrbit );
     const moonData = [
@@ -274,10 +277,11 @@ var tbdCalendar = tbdCalendar || ( function()
     return roll < 15 ? 0 : ( roll < 18 ? 1 : 2 );
   };
 
-  // Return the weather for the provided date
-  var forecastWeather = function( date )
+  // Return the weather for the provided dateValue
+  // dateValue is value member of createDate
+  var forecastWeather = function( dateValue )
   {
-    const yearAndDay = yearAndDayFromDate( date );
+    const yearAndDay = yearAndDayFromDate( dateValue );
     const season = yearAndDay.day > 75 && yearAndDay.day < 350
       // Spring, Summer, or Fall
       ? ( yearAndDay.day < 166 ? 1 : ( yearAndDay.day < 257 ? 2 : 3 ) )
@@ -298,10 +302,10 @@ var tbdCalendar = tbdCalendar || ( function()
     return temperatures[ season ][ temperatureIndex ] + ' ' + windLevels[ windIndex ] + precipitation[ season ][ precipitationIndex ];
   };
 
-  // Return an html entry describing the moon state for a particular date
-  var moonEntry = function( date )
+  // Return an html entry describing the moon state for a particular dateValue
+  var moonEntry = function( dateValue )
   {
-    const currentMoon = moonState( date );
+    const currentMoon = moonState( dateValue );
     return '<table>'
       + '<tr><td>' + currentMoon.description + ' Moon </td>'
       + '<td><img src="' + currentMoon.image + '" style="width:30px;height:30px;"></td></tr>'
@@ -317,7 +321,7 @@ var tbdCalendar = tbdCalendar || ( function()
     const arrowStyle = 'style="border: none; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 195px solid ' + redColor + '; margin-bottom: 2px; margin-top: 2px;"';
     const headStyle = 'style="color: ' + redColor + '; font-size: 18px; text-align: left; font-variant: small-caps; font-family: Times, serif;"';
     const subStyle = 'style="font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;"';
-    const readableStrings = humanStrings( current );
+    const readableStrings = humanStrings( current.value );
 
     sendChat( 
       'the 8-ball', 
@@ -329,7 +333,7 @@ var tbdCalendar = tbdCalendar || ( function()
           + readableStrings.date
           + '<br>The time is: ' + readableStrings.time 
           + '<br>Next Long Rest: ' + longRestAvailability( current )
-          + '<br>' + moonEntry( current )
+          + '<br>' + moonEntry( current.value )
           + '<br>' + current.weather ) );
   };
 
@@ -372,7 +376,7 @@ var tbdCalendar = tbdCalendar || ( function()
     const subStyle = 'style="font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;"';
     const anchorStyle1 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + redColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 100px;';
     const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + redColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
-    const readableDate = interpretDate( current );
+    const readableDate = interpretDate( current.value );
     const timeString = humanTimeString( readableDate.hours, readableDate.minutes );
     const menu = makeDiv(
       divStyle,
@@ -387,7 +391,7 @@ var tbdCalendar = tbdCalendar || ( function()
         + '<tr><td>Next Long Rest: </td><td>' + longRestAvailability( current ) + '</td></tr>'
         + '</table>'
         + makeDiv( arrowStyle, '' )
-        + moonEntry( current )
+        + moonEntry( current.value )
         + '<br>' + current.weather 
         + makeDiv( arrowStyle, '' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcrest">Long Rest Finished</a>' )
@@ -400,20 +404,20 @@ var tbdCalendar = tbdCalendar || ( function()
   var setDay = function( dayString )
   {
     const current = currentDate();
-    const readableDate = interpretDate( current );
+    const readableDate = interpretDate( current.value );
     readableDate.day = Number( dayString );
     current.value = encodeDateValue( readableDate );
-    current.weather = forecastWeather( current );
+    current.weather = forecastWeather( current.value );
     storeDate( current );
   };
 
   var setMonth = function( monthString )
   {
     const current = currentDate();
-    const readableDate = interpretDate( current );
+    const readableDate = interpretDate( current.value );
     readableDate.month = monthString;
     current.value = encodeDateValue( readableDate );
-    current.weather = forecastWeather( current );
+    current.weather = forecastWeather( current.value );
     storeDate( current );
   };
 
@@ -433,7 +437,7 @@ var tbdCalendar = tbdCalendar || ( function()
     current.value += minutes;
     if ( originalMinutesInDay + minutes >= minutesPerDay ) {
       // Day flips to a new. Update weather
-      current.weather = forecastWeather( current );
+      current.weather = forecastWeather( current.value );
     }
     storeDate( current );
   };
@@ -441,7 +445,7 @@ var tbdCalendar = tbdCalendar || ( function()
   var setTime = function( timeString )
   {
     const current = currentDate();
-    const readableDate = interpretDate( current );
+    const readableDate = interpretDate( current.value );
     const timeValues = timeString.split( ':' );
     if ( timeValues.length == 2 ) {
       readableDate.hours = Number( timeValues[ 0 ] );
@@ -454,10 +458,10 @@ var tbdCalendar = tbdCalendar || ( function()
   var setYear = function( yearString )
   {
     const current = currentDate();
-    const readableDate = interpretDate( current );
+    const readableDate = interpretDate( current.value );
     readableDate.year = Number( yearString );
     current.value = encodeDateValue( readableDate );
-    current.weather = forecastWeather( current );
+    current.weather = forecastWeather( current.value );
     storeDate( current );
   };
 
@@ -518,7 +522,7 @@ var tbdCalendar = tbdCalendar || ( function()
   {
     const current = currentDate();
     for ( var i = 0; i < 10; i++ ) {
-      const readable = humanStrings( current );
+      const readable = humanStrings( current.value );
       const currentMoon = moonState( current );
       log( readable.date + ' @ ' + readable.time + ', Moon: ' + currentMoon.description + ' Days til full: ' + currentMoon.daysTilFull );
       current.value += 1440;
