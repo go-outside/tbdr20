@@ -92,7 +92,7 @@ var tbdCalendar = tbdCalendar || ( function()
   // If no effects are stored, return an empty array
   var currentEffects = function()
   {
-    const effects = state.tbdCalendar !== undefined && state.tbdCalendar.effects instanceof Array
+    const effects = state.tbdCalendar !== undefined && state.tbdCalendar.effects !== undefined
       ? state.tbdCalendar.effects
       : [];
     // Deep copy the effects array
@@ -102,7 +102,7 @@ var tbdCalendar = tbdCalendar || ( function()
         const copy = {};
         copyEffect( effect, copy );
         return copy;
-      } );
+      } ).sort( ( a, b ) => a.expiration < b.expiration );
   };
 
   // Deep copy effects array into state.tbdCalendar.effects
@@ -337,28 +337,54 @@ var tbdCalendar = tbdCalendar || ( function()
     return temperatures[ season ][ temperatureIndex ] + ' ' + windLevels[ windIndex ] + precipitation[ season ][ precipitationIndex ];
   };
 
+  var humanNumber = function( value )
+  {
+    if ( Math.floor( value ) == value ) {
+      return String( value );
+    } else {
+      return value.toFixed( 1 );
+    }
+  };
+
+  // Return a human readable string representing the time remaining on an effect
+  var humanReadableEffectDuration = function( currentDateValue, effectExpiration )
+  {
+    const difference = effectExpiration - currentDateValue;
+    if ( difference > 0 ) {
+      if ( difference >= minutesPerDay ) {
+        return humanNumber( difference / minutesPerDay ) + " d";
+      } else if ( difference >= 60 ) {
+        return humanNumber( difference / 60 ) + " hr";
+      } else {
+        return humanNumber( difference ) + " min";
+      }
+    } else {
+      return 'Expired';
+    }
+  };
 
   // Return html string to represent a effect record in the effects table
   // Contains description, duration, and if player is gm includes delete button in a table row
-  var effectsTableRow = function( effect, playerIsGm )
+  var effectsTableRow = function( effect, dateValue, playerIsGm )
   {
     if ( playerIsGm || effect.visibility == EffectVisibility.PUBLIC ) {
       const anchorStyle = 'style="border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + redColor + '; border-radius: 4px; box-shadow: 1px 1px 1px #707070;"';
-      const baseRow = '<td>' + effect.description + '</td><td>need duration ' + String( effect.expiration ) + '</td>';
-      const gmContent = playerIsGm ? ( '<td><a ' + anchorStyle + ' href="!fcremoveeffect ' + String( effect.id ) + '"><b>X</b></a></td></tr>' ) : '';
-      return '<tr>' + baseRow + gmContent + '</tr>';
+      const visibilityStyle = effect.visibility == EffectVisibility.PUBLIC ? 'style="font-weight: bold;"' : '';
+      const baseRow = '<td>' + effect.description + '</td><td align="right">' + humanReadableEffectDuration( dateValue, effect.expiration ) + ' </td>';
+      const gmContent = playerIsGm ? ( '<td align="right"><a ' + anchorStyle + ' href="!fcremoveeffect,' + String( effect.id ) + '"><b>X</b></a></td>' ) : '';
+      return '<tr ' + visibilityStyle + '>' + baseRow + gmContent + '</tr>';
     }
     return '';
   };
 
   // Return an html table for the list of effects
   // Return an empty string if there are no visible effects
-  var effectsTable = function( effects, playerIsGm )
+  var effectsTable = function( effects, dateValue, playerIsGm )
   {
     var content = '';
-    effects.forEach( function( effect ) { content = content + effectsTableRow( effect, playerIsGm ); } );
+    effects.forEach( function( effect ) { content = content + effectsTableRow( effect, dateValue, playerIsGm ); } );
     return content.length > 0
-      ? ( '<table style=\'margin-left:auto; margin-right:auto; font-size: 12px; width: 200px\'>' + content + '</table>' )
+      ? ( '<table style=\'margin-left:auto; margin-right:auto; font-size: 12px;\' width=\'100%\'>' + content + '</table>' )
       : '';
   };
 
@@ -383,7 +409,7 @@ var tbdCalendar = tbdCalendar || ( function()
     const subStyle = 'style="font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;"';
     const readableStrings = humanStrings( current.value );
 
-    const effectsTableContent = effectsTable( currentEffects(), false );
+    const effectsTableContent = effectsTable( currentEffects(), current.value, false );
     const effectsEntry = effectsTableContent.length == 0 
       ? ''
       : ( makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Effects' ) + effectsTableContent );
@@ -399,8 +425,8 @@ var tbdCalendar = tbdCalendar || ( function()
           + '<br>The time is: ' + readableStrings.time 
           + '<br>Next Long Rest: ' + longRestAvailability( current )
           + '<br>' + moonEntry( current.value )
-          + '<br>' + current.weather ),
-          + effectsEntry );
+          + '<br>' + current.weather
+          + effectsEntry ) );
   };
 
   // Return a string describing availability of once per day long rest
@@ -450,7 +476,7 @@ var tbdCalendar = tbdCalendar || ( function()
     const readableDate = interpretDate( current.value );
     const timeString = humanTimeString( readableDate.hours, readableDate.minutes );
 
-    const effectsTableContent = effectsTable( currentEffects(), true );
+    const effectsTableContent = effectsTable( currentEffects(), current.value, true );
     const effectsEntry = effectsTableContent.length == 0 
       ? ''
       : ( makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Effects' ) + effectsTableContent );
@@ -485,12 +511,21 @@ var tbdCalendar = tbdCalendar || ( function()
   {
     const match = rawDuration.match( /\s*([0-9]+\.?[0-9]*)\s*([a-zA-z]+)/ );
     if ( match.length == 3 ) {
-      return Number( match[ 1 ] );
+      const value = Number( match[ 1 ] );
+      const units = match[ 2 ].toLowerCase();
+      if ( [ 'm', 'min', 'minute', 'minutes' ].includes( units ) ) {
+        return value;
+      } else if ( [ 'h', 'hr', 'hour', 'hours' ].includes( units ) ) {
+        return 60 * value;
+      } else if ( [ 'd', 'day', 'days' ].includes( units ) ) {
+        return minutesPerDay * value;
+      } else {
+        return -1;
+      }
     } else {
       return -1;
     }
   };
-
 
   // Add an effect to the current list of effects
   // tokens are the input tokens parsed from chat
