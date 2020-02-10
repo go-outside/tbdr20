@@ -500,6 +500,7 @@ var tbdCalendar = tbdCalendar || ( function()
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcrest">Long Rest Finished</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcadd10minutes">Add 10 minutes</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddhour">Add an hour</a>' )
+        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddday">Add a day</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcshare">Share Calendar</a>' ) 
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddeffect,' + addEffectInput() + '">Add Effect</a>' ) 
         + effectsEntry );
@@ -635,6 +636,9 @@ var tbdCalendar = tbdCalendar || ( function()
           showCalendarInterface( message );
         } else if ( command === '!fcaddhour' ) {
           addTime( 60 );
+          showCalendarInterface( message );
+        } else if ( command === '!fcaddday' ) {
+          addTime( minutesPerDay );
           showCalendarInterface( message );
         } else if ( command === '!fcmonth' && tokens.length > 1 ) {
           setMonth( tokens[ 1 ] );
