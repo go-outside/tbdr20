@@ -1,4 +1,17 @@
 
+!combat bugs:
+Adding 4th or 5th Grick screwed up sorting order. 
+  Sort moved the top entry, Eldon/15, into the 13's.
+  Eldon kept 15 number but for some reason was in different order
+
+!move bugs:
+Cannot add mover as a player
+  const controllers = graphic.get( Roll20.Objects.CONTROLLEDBY ).split( ',' );
+  Need to have true value from this expression: controllers.find( controller => controller == playerId )
+
+!fc feature:
+  increment 24 hrs
+
 "be aware that Roll20 may throttle your use of state."
 
 It appears as ifn Campaign.get( 'turnorder' ) does not change if one of its items is remove from play

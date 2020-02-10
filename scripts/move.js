@@ -484,13 +484,13 @@ var tbdMove = tbdMove || ( function()
     // Now make the new mover if possible
     const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
     if ( graphic !== undefined ) {
-      const controllers = graphic.get( Roll20.Objects.CONTROLLEDBY ).split( ',' );
-      if ( playerIsGM( playerId ) 
-        || controllers == Roll20.Objects.ALL 
-        || controllers.find( controller => controller == playerId )
-      ) {
-        const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
-        if ( maybeCharacter !== undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
+      if ( maybeCharacter !== undefined ) {
+        const controllers = maybeCharacter.get( Roll20.Objects.CONTROLLEDBY ).split( ',' );
+        if ( playerIsGM( playerId ) 
+          || controllers == Roll20.Objects.ALL 
+          || controllers.find( controller => controller == playerId )
+        ) {
           const player = getObj( Roll20.Objects.PLAYER, playerId );
           var color = player === undefined ? Roll20.Colors.BLACK : player.get( Roll20.Objects.COLOR );
           // -- begin WTF
