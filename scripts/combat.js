@@ -97,7 +97,22 @@ var tbdCombat = tbdCombat || ( function()
     'sentry-gun', 
     'all-for-one', 
     'angel-outfit', 
-    'archery-target' ];
+    'archery-target',
+    'target-arrows',
+    'monster-grasp',
+    'teleport',
+    'slavery-whip',
+    'eye-of-horus',
+    'coma',
+    'invisible',
+    'medusa-head',
+    'falling',
+    'imprisoned',
+    'surprised',
+    'fire',
+    'two-shadows'
+    'hammer-drop',,
+    'beanstalk' ];
   
   const WhenToAdvanceCondition = {
     AFTER_TURN : 'afterTurn',
@@ -119,27 +134,31 @@ var tbdCombat = tbdCombat || ( function()
 
   // Note that two word condition names will require rework for resolution of api command
   var conditions = [];
-  conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'fluffy-wing' ) );
-  conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'frozen-orb' ) );
-  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'death-zone' ) );
-  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );
+  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'target-arrows' ) );
+  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'sprint' ) );
+  conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'snail' ) );
+  conditions.push( createCondition( 'Mirror', ' is has multiple images.', ' no longer has multiple images.', 'two-shadows' ) );
+  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'monster-grasp' ) );
+  conditions.push( createCondition( 'Blink', ' is blinks out of existance.', ' has returned.', 'teleport' ) );
+  conditions.push( createCondition( 'Weakness', ' is saped of strength.', ' strength returns.', 'slavery-whip' ) );
+  conditions.push( createCondition( 'True seeing', ' has true sight.', ' no longer has true sight.', 'eye-of-horus' ) );
   conditions.push( createCondition( 'Charmed', ' has been charmed.', ' is thinking clearly again.', 'half-heart' ) );
+  conditions.push( createCondition( 'Hammer', ' is attacked by the hammer of the gods.', ' is no longer under siege.', 'hammer-drop' ) );
   conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'broken-skull' ) );
   conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
   conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'screaming' ) );
-  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'fist' ) );
-  conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'back-pain' ) );
-  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'ninja-mask' ) );
-  conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'aura' ) );
-  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'pummeled' ) );
+  conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'coma' ) );
+  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'invisible' ) );
+  conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'back-pain' ) );
+  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'medusa-head' ) );
   conditions.push( createCondition( 'Poisoned', ' is poisoned.', ' is no longer poisoned.', 'radioactive' ) );
-  conditions.push( createCondition( 'Prone', ' is prone.', ' is no longer prone.', 'arrowed' ) );
-  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', 'interdiction' ) );
-  conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', 'broken-shield' ) );
+  conditions.push( createCondition( 'Prone', ' is prone.', ' is no longer prone.', 'falling' ) );
+  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', 'imprisoned' ) );
+  conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', 'surprised' ) );
   conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
-  conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'half-haze' ) );
-  conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'chemical-bolt' ) );
-  conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'cobweb' ) );
+  conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'fire' ) );
+  conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'death-zone' ) );
+  conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'beanstalk' ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
 
   // Return the condition matching name. Return undefined if not found
