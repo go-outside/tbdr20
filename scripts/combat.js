@@ -98,6 +98,7 @@ var tbdCombat = tbdCombat || ( function()
     'all-for-one', 
     'angel-outfit', 
     'archery-target',
+    //new ones test is the name of the group of markers
     'target-arrows',
     'monster-grasp',
     'teleport',
