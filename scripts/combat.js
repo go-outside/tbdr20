@@ -201,12 +201,34 @@ var tbdCombat = tbdCombat || ( function()
     return turnOrder.filter( function( participant ) { return getObj( Roll20.Objects.GRAPHIC, participant.id ) !== undefined; } );
   };
 
+  // Sort array using compare to order elements
+  // Modifies array emplace
+  var bubbleSort = function( array, compare )
+  {
+    var changes = 1;
+    while ( changes > 0 ) {
+      changes = 0;
+      for ( var i = 1; i < array.length; ++i ) {
+        if ( compare( array[ i - 1 ], array[ i ] ) ) {
+          const temp = array[ i - 1 ];
+          array[ i - 1 ] = array[ i ];
+          array[ i ] = temp;
+          ++changes;
+        }
+      }
+    }
+  };
+
   // Sort turnOrder by initiative
   // Modifies contents of turnOrder
   var sortTurnOrder = function( turnOrder )
   {
     // pr is an awful parameter name forced by the r20 system. pr is initiative
-    turnOrder.sort( ( a, b ) => a.tookTurn == b.tookTurn ? ( a.pr < b.pr ) : ( a.tookTurn > b.tookTurn ) );
+    bubbleSort( turnOrder, ( a, b ) => a.tookTurn == b.tookTurn ? ( a.pr < b.pr ) : ( a.tookTurn > b.tookTurn ) );
+    // The Array.sort method should work. Why does a homebrew bubble sort do the trick?
+    // This looks like a roll20 bug. Either Array.sort is broken, or turnOrder is not a full-fledged array object
+    // Maybe roll20 uses and inferior node.js backend?
+    // turnOrder.sort( ( a, b ) => a.tookTurn == b.tookTurn ? ( a.pr < b.pr ) : ( a.tookTurn > b.tookTurn ) );
   };
 
   // Global state serialization
