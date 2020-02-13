@@ -606,6 +606,7 @@ var tbdMove = tbdMove || ( function()
   };
 
   return {
+    clearAll: clearAll,
     // takes arguments: playerId, graphicId
     startMoveForPlayer: startMoveForPlayer,
     runTests: runTests,

@@ -25,6 +25,8 @@ var tbdCombat = tbdCombat || ( function()
     API : 'api'
   };
   Roll20.Objects = {
+    _ID : '_id',
+    _ONLINE : '_online',
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
     CONTROLLEDBY : 'controlledby',
@@ -150,6 +152,15 @@ var tbdCombat = tbdCombat || ( function()
     return conditions.find( function( entry ) { return entry.name == conditionName; } );
   }
   
+  // Return the player id for the first player found that is GM
+  // Return undefined when none is available
+  var findFirstOnlineGmPlayerId = function()
+  {
+    return findObjs( { _type: 'player', _online: true } )
+      .map( entry => entry.get( Roll20.Objects._ID ) )
+      .find( id => playerIsGM( id ) );
+  };
+
   // Create a record of a condition to associate with a token
   // conditionId: unique identifier for tracking the condition in condition table
   // graphicId: the id of the graphic on which to associate the condition
@@ -267,6 +278,7 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Notify chat of participant turn
+  // If !move is installed, clear all movers and then initialize !move for the token with turn
   var announceTurn = function( participant )
   {
     const graphic = getObj( Roll20.Objects.GRAPHIC, participant.id );
@@ -279,11 +291,21 @@ var tbdCombat = tbdCombat || ( function()
       }
       // Trigger move menu and initialization if that module is installed
       if ( tbdMove !== undefined ) {
+        tbdMove.clearAll();
         const controllers = participantControllers( participant );
         if ( controllers.length == 0 ) {
-          sendChat( Roll20.ANNOUNCER, '/w gm Give control to gm?' );
+          const gmId = findFirstOnlineGmPlayerId();
+          if ( gmId !== undefined ) {
+            tbdMove.startMoveForPlayer( gmId, participant.id );
+          }
         } else if ( controllers.length == 1 ) {
-          tbdMove.startMoveForPlayer( controllers[ 0 ], participant.id );
+          const playerId = controllers[ 0 ];
+          const player = getObj( Roll20.Objects.PLAYER, playerId );
+          if ( player !== undefined && player.get( Roll20.Objects._ONLINE ) ) {
+            tbdMove.startMoveForPlayer( playerId, participant.id );
+          } else {
+            sendChat( Roll20.ANNOUNCER, '/w gm Player is not online to control movement' );
+          }
         } else {
           sendChat( Roll20.ANNOUNCER, '/w gm Cannot hand off !move control of \'' + tokenName + '\' because it has multiple controllers' );
         }
