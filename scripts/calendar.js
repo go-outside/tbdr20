@@ -697,7 +697,7 @@ var tbdCalendar = tbdCalendar || ( function()
   return {
     runTests: runTests,
     registerEventHandlers: registerEventHandlers };
-}() );
+} )();
 
 on( 
   "ready",

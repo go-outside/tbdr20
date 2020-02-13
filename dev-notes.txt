@@ -1,24 +1,12 @@
 
-!combat bugs:
-Adding 4th or 5th Grick screwed up sorting order. 
-  Sort moved the top entry, Eldon/15, into the 13's.
-  Eldon kept 15 number but for some reason was in different order
 
-!move bugs:
-Cannot add mover as a player
-  const controllers = graphic.get( Roll20.Objects.CONTROLLEDBY ).split( ',' );
-  Need to have true value from this expression: controllers.find( controller => controller == playerId )
+Refactor Roll20 objects into Tbdr20 namespace and pull global use functions into new script Tbdr20
 
-!fc feature:
-  increment 24 hrs
+Call !move for tokens in turn order
+
+
 
 "be aware that Roll20 may throttle your use of state."
-
-It appears as ifn Campaign.get( 'turnorder' ) does not change if one of its items is remove from play
-interestingly the turn order window reflects the removal from page. It is just the api data that is not purged
-
-Remove condition at any time
- -- add condition table with remove buttons
 
 Handle duplicate condition assignment (keep longest duration)
 
@@ -27,30 +15,9 @@ track on gm layer
 
 track on( 'destroy:graphic', handle... ) rather than purging turn order
 
-open TO on !combat
-close TO on !combat clear
-Report remaining conditions and durations to GM at end of participant turns
-on advance or announce turn, ensure turnOrder[ 0 ] is still present before acting
-
-Campaign().set( { initiativepage: false } )
-
 on 'end-combat' add combat time to calendar? or update calendar to have combat round precision
 probably need per round precision in calendar for case of effects with duration extending beyound the combat
 maybe time is rounded up to nearest minute when combat ends
 
 What does chat command /direct do?
-
-handleTurnOrder change only fires when turn order dialog is clicked -- not when set programmatically
-
-  // Return true if newTurnOrder matches originalTurnOrder where the first element has moved to the back
-  // Test by graphicId
-  var turnOrderHasBeenCycled = function( newTurnOrder, originalTurnOrder )
-  {
-    return originalTurnOrder.length > 0 && originalTurnOrder.length == newTurnOrder.length && originalTurnOrder.every(
-      function( originalParticipant, originalTurnIndex )
-      {
-        const newTurnIndex = ( originalTurnIndex == 0 ? originalTurnOrder.length : originalTurnIndex ) - 1;
-        return originalParticipant.graphicId == newTurnOrder[ newTurnIndex ].graphicId;
-      } );
-  };
 

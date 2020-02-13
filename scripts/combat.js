@@ -27,6 +27,7 @@ var tbdCombat = tbdCombat || ( function()
   Roll20.Objects = {
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
+    CONTROLLEDBY : 'controlledby',
     DISPLAY_NAME : 'displayname',
     GM_LAYER : 'gmlayer',
     GRAPHIC : 'graphic',
@@ -224,6 +225,19 @@ var tbdCombat = tbdCombat || ( function()
     return participants.length == 0 || participants.every( function( participant ) { return participant.tookTurn == true; } );
   };
 
+  // Return a list of playerId's who have control over the participant
+  var participantControllers = function( participant )
+  {
+    const graphic = getObj( Roll20.Objects.GRAPHIC, participant.id );
+    if ( graphic !== undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
+      if ( maybeCharacter !== undefined ) {
+        return maybeCharacter.get( Roll20.Objects.CONTROLLEDBY ).split( ',' ).filter( entry => entry.length > 0 );
+      }
+    }
+    return [];
+  };
+
   // Return the roll modifier due to a particular ability score
   var abilityScoreModifier = function( score )
   {
@@ -263,7 +277,19 @@ var tbdCombat = tbdCombat || ( function()
       } else {
         sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
       }
-        
+      // Trigger move menu and initialization if that module is installed
+      if ( tbdMove !== undefined ) {
+        const controllers = participantControllers( participant );
+        if ( controllers.length == 0 ) {
+          sendChat( Roll20.ANNOUNCER, '/w gm Give control to gm?' );
+        } else if ( controllers.length == 1 ) {
+          tbdMove.startMoveForPlayer( controllers[ 0 ], participant.id );
+        } else {
+          sendChat( Roll20.ANNOUNCER, '/w gm Cannot hand off !move control of \'' + tokenName + '\' because it has multiple controllers' );
+        }
+      } else {
+        sendChat( Roll20.ANNOUNCER, '/w gm Cannot find tbdMove' );
+      }
     }
   };
 
@@ -831,6 +857,6 @@ var tbdCombat = tbdCombat || ( function()
   return {
     runTests: runTests,
     registerEventHandlers: registerEventHandlers };
-}() );
+} )();
 
 on( "ready", function() { tbdCombat.registerEventHandlers(); } );

@@ -526,6 +526,14 @@ var tbdMove = tbdMove || ( function()
     }
   };
 
+  /// Create a mover for the playerId / graphicId pair
+  /// Present the move menu to that player
+  var startMoveForPlayer = function( playerId, graphicId )
+  {
+    maybeCreateMover( playerId, graphicId );
+    showMoveMenu( playerId );
+  };
+
   // Delegate resolution of chat event
   var handleChatMessage = function( message )
   {
@@ -547,8 +555,7 @@ var tbdMove = tbdMove || ( function()
             }
           } else if ( subcommand == 'start' ) {
             if ( message.selected !== undefined && message.selected.length == 1 ) {
-              maybeCreateMover( message.playerid, message.selected[ 0 ]._id );
-              showMoveMenu( message.playerid );
+              startMoveForPlayer( message.playerid, message.selected[ 0 ]._id );
             }
           } else if ( subcommand == 'terrain' ) {
             const mover = findMoverByPlayer( message.playerid );
@@ -599,8 +606,10 @@ var tbdMove = tbdMove || ( function()
   };
 
   return {
+    // takes arguments: playerId, graphicId
+    startMoveForPlayer: startMoveForPlayer,
     runTests: runTests,
     registerEventHandlers: registerEventHandlers };
-}() );
+} )();
 
 on( "ready", function() { tbdMove.registerEventHandlers(); } );
