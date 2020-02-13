@@ -27,6 +27,7 @@ var tbdCombat = tbdCombat || ( function()
   Roll20.Objects = {
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
+    DISPLAY_NAME : 'displayname',
     GM_LAYER : 'gmlayer',
     GRAPHIC : 'graphic',
     LAYER : 'layer',
@@ -38,6 +39,7 @@ var tbdCombat = tbdCombat || ( function()
     STATUS_MARKERS : 'statusmarkers',
     TEXT : 'text',
     TOKEN : 'token ',
+    TOKEN_MARKERS : 'token_markers',
     TURN_ORDER : 'turnorder'
   };
   Roll20.Verbs = {
@@ -117,7 +119,24 @@ var tbdCombat = tbdCombat || ( function()
     'beanstalk' ];
 
   Roll20.CustomTokenMarkers = {
-    BEANSTALK : 'beanstalk::261508'
+    BEANSTALK : 'beanstalk::261508',
+    COMA : 'coma::261509',
+    EYE_OF_HORUS : 'eye-of-horus::261510',
+    FALLING : 'falling::261511',
+    FIRE : 'fire::261512',
+    IMPRISONED : 'imprisoned::261513',
+    INVISIBLE : 'invisible::261514',
+    MEDUSA_HEAD : 'medusa-head::261515',
+    MONSTER_GRASP : 'monster-grasp::261516',
+    SLAVERY_WHIP : 'slavery-whip::261517',
+    SNAIL : 'snail::261518',
+    SPRINT : 'sprint::261519',
+    STONED_SKULL : 'stoned-skull::261520',
+    SURPRISED : 'surprised::261521',
+    TARGET_ARROWS : 'target-arrows::261522',
+    TELEPORT : 'teleport::261523',
+    HAMMER_DROP : 'hammer-drop::261574',
+    TWO_SHADOWS : 'two-shadows::261575'
   };
   
   const WhenToAdvanceCondition = {
@@ -692,6 +711,21 @@ log( originalMarkers );
     }
   };
 
+  var showTokenMarkers = function( playerId )
+  {
+    const tokenMarkers = JSON.parse( Campaign().get( Roll20.Objects.TOKEN_MARKERS ) );
+    const content = tokenMarkers.reduce(
+      function( accumulated, marker )
+      {
+        return accumulated + '<br>' + marker.tag;
+      },
+      '' );
+    log( tokenMarkers );
+    const player = getObj( Roll20.Objects.PLAYER, playerId );
+    log( player );
+    sendChat( Roll20.ANNOUNCER, '/w "' + player.get( Roll20.Objects.DISPLAY_NAME ) + '" ' + content );
+  };
+
   // Delegate resolution of chat event
   var handleChatMessage = function( message )
   {
@@ -745,6 +779,8 @@ log( originalMarkers );
             } else if ( subcommand == 'setconditionduration'  && tokens.length == 3 ) {
               setPrototypeDuration( Number( tokens[ 2 ] ) );
               showCombatMenu();
+            } else if ( subcommand == 'listmarkers' ) {
+              showTokenMarkers( message.playerid );
             }
           }
         }
@@ -831,10 +867,6 @@ log( originalMarkers );
     on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
 
     log( 'There be dragons! Combat initialized.' );
-
-    const tokenMarkers = JSON.parse(Campaign().get("token_markers"));
-    log( tokenMarkers );
-
 	};
 
   var runTests = function()
