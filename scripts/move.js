@@ -39,6 +39,7 @@ var tbdMove = tbdMove || ( function()
     COLOR : 'color',
     CONTROLLEDBY : 'controlledby',
     DISPLAY_NAME : 'displayname',
+    GMLAYER : 'gmlayer',
     GRAPHIC : 'graphic',
     ID : 'id',
     LEFT : 'left',
@@ -68,7 +69,7 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Return a new mover object
-  var createMover = function( graphicId, characterId, playerId, color )
+  var createMover = function( graphicId, characterId, playerId, layer, color )
   {
     return { 
       graphicId: graphicId, 
@@ -81,6 +82,8 @@ var tbdMove = tbdMove || ( function()
       circlePathIds: [],
       // Assigns base color for movement graphics
       color: color,
+      // Identify layer where move graphics / paths should be drawn
+      layer: layer,
       // Assign modifier for movement terrain types
       terrain: Terrain.NORMAL };
   };
@@ -286,7 +289,7 @@ var tbdMove = tbdMove || ( function()
   // Return undefined if circles has size less than two
   // circles are in canvas coordinates
   // path is created on pageId
-  var createTrailGraphic = function( circles, pageId, color )
+  var createTrailGraphic = function( circles, pageId, layer, color )
   {
     if ( circles.length > 1 ) {
       const firstCircle = circles[ 0 ];
@@ -313,7 +316,7 @@ var tbdMove = tbdMove || ( function()
         { pageid: pageId,
           left: 0.5 * ( minimum.x + maximum.x ),
           top: 0.5 * ( minimum.y + maximum.y ),
-          layer: Roll20.Objects.OBJECTS,
+          layer: layer,
           width: maximum.x - minimum.x,
           height: maximum.y - minimum.y,
           stroke: color,
@@ -329,7 +332,7 @@ var tbdMove = tbdMove || ( function()
   // Create a new circle and return its graphic id
   // circle is in canvas coordinates
   // circle is created on pageId
-  var createCircleGraphic = function( circle, pageId, color, strokeWidth )
+  var createCircleGraphic = function( circle, pageId, layer, color, strokeWidth )
   {
     const radius = circle.radius;
     // Magic 'half' radius here is required to create a circular shape
@@ -347,7 +350,7 @@ var tbdMove = tbdMove || ( function()
         top: circle.top,
         width: 2 * radius,
         height: 2 * radius,
-        layer: Roll20.Objects.OBJECTS,
+        layer: layer,
         stroke: color,
         stroke_width: strokeWidth,
         path: JSON.stringify( path ) } );
@@ -368,13 +371,14 @@ var tbdMove = tbdMove || ( function()
       const lastCircle = mover.circles[ lastCircleIndex ];
       const canvasLimitCircle = canvasCircleFrom( lastCircle, pageId );
       canvasLimitCircle.radius /= distanceMultiplierForTerrain( mover );
-      mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, mover.color, 6 ) );
+      mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, mover.layer, mover.color, 6 ) );
       canvasLimitCircle.radius += 2;
-      mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, Roll20.Colors.WHITE, 3 ) );
+      mover.circlePathIds.push( createCircleGraphic( canvasLimitCircle, pageId, mover.layer, Roll20.Colors.WHITE, 3 ) );
     }
     const routePathId = createTrailGraphic( 
       mover.circles.map( function( circle ) { return canvasCircleFrom( circle, pageId ); } ),
-      pageId, 
+      pageId,
+      mover.layer,
       mover.color );
     if ( routePathId !== undefined ) {
       mover.circlePathIds.push( routePathId );
@@ -486,7 +490,7 @@ var tbdMove = tbdMove || ( function()
     if ( graphic !== undefined ) {
       const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
       if ( maybeCharacter !== undefined ) {
-        const controllers = maybeCharacter.get( Roll20.Objects.CONTROLLEDBY ).split( ',' );
+        const controllers = maybeCharacter.get( Roll20.Objects.CONTROLLEDBY ).split( ',' ).filter( item => item.length > 0 );
         if ( playerIsGM( playerId ) 
           || controllers == Roll20.Objects.ALL 
           || controllers.find( controller => controller == playerId )
@@ -501,7 +505,13 @@ var tbdMove = tbdMove || ( function()
             color = color + '0';
           }
           // -- end WTF
-          const mover = createMover( graphicId, maybeCharacter.id, playerId, color );
+          const mover = createMover( 
+            graphicId, 
+            maybeCharacter.id, 
+            playerId, 
+            // Render graphics on the GM layer for tokens with no controllers
+            controllers.length == 0 ? Roll20.Objects.GMLAYER : Roll20.Objects.OBJECTS, 
+            color );
           addMovementCircle( graphic, mover );
           updateMoverGraphics( graphic, mover );
           state.tbdMove.movers.push( mover );
