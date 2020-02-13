@@ -35,6 +35,7 @@ var tbdCombat = tbdCombat || ( function()
     PATH : 'path',
     PLAYER : 'player',
     STATUS : 'status_',
+    STATUS_MARKERS : 'statusmarkers',
     TEXT : 'text',
     TOKEN : 'token ',
     TURN_ORDER : 'turnorder'
@@ -111,9 +112,13 @@ var tbdCombat = tbdCombat || ( function()
     'imprisoned',
     'surprised',
     'fire',
-    'two-shadows'
-    'hammer-drop',,
+    'two-shadows',
+    'hammer-drop',
     'beanstalk' ];
+
+  Roll20.CustomTokenMarkers = {
+    BEANSTALK : 'beanstalk::261508'
+  };
   
   const WhenToAdvanceCondition = {
     AFTER_TURN : 'afterTurn',
@@ -159,7 +164,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'fire' ) );
   conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'death-zone' ) );
-  conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', 'beanstalk' ) );
+  conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', Roll20.CustomTokenMarkers.BEANSTALK ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
 
   // Return the condition matching name. Return undefined if not found
@@ -315,6 +320,34 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
+  /// Set status or token marker for the given rollObject
+  /// rollObject is the graphic token
+  /// Condition is an object generated from createCondition
+  /// state is true or false
+  var setTokenMarker = function( rollObject, condition, state )
+  {
+//    rollObject.set( Roll20.Objects.STATUS + condition.marker, state );
+    const originalMarkers = rollObject.get( Roll20.Objects.STATUS_MARKERS ).split( ',' );
+log( 'originals' );
+log( originalMarkers );
+    if ( state == true ) {
+      // Add the condition
+      if ( ! originalMarkers.includes( condition.marker ) ) {
+        originalMarkers.push( condition.marker );
+      }
+    } else {
+      const index = originalMarkers.findIndex( item => item == condition.marker );
+      // Remove the condition
+      if ( index >= 0 ) {
+        originalMarkers.splice( index, 1 );
+      }
+    }
+    const filteredMarkers = originalMarkers.filter( marker => marker.length > 0 );
+    rollObject.set( Roll20.Objects.STATUS_MARKERS, filteredMarkers.join( ',' ) );
+log( 'updated originals' );
+log( originalMarkers );
+  };
+
   // Remove status marker from graphic
   // Send recover message
   var purgeConditionRecord = function( record )
@@ -326,7 +359,7 @@ var tbdCombat = tbdCombat || ( function()
       const condition = findCondition( record.conditionName );
       if ( condition !== undefined ) {
         // Remove the graphical status marker
-        rollObject.set( Roll20.Objects.STATUS + condition.marker, false );
+        setTokenMarker( rollObject, condition, false );
         if ( maybeCharacter !== undefined ) {
           sendConditionRecoveredMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
         }
@@ -434,7 +467,7 @@ var tbdCombat = tbdCombat || ( function()
           // selectObjects are pure state. Call getObj to get full fledged Roll20 Objects, which have .get method
           const rollObject = getObj( selectObject._type, selectObject._id );
           // Add the graphical status marker
-          rollObject.set( Roll20.Objects.STATUS + condition.marker, true );
+          setTokenMarker( rollObject, condition, true );
           const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
           if ( maybeCharacter !== undefined ) {
             sendConditionContractedMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
@@ -798,6 +831,10 @@ var tbdCombat = tbdCombat || ( function()
     on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
 
     log( 'There be dragons! Combat initialized.' );
+
+    const tokenMarkers = JSON.parse(Campaign().get("token_markers"));
+    log( tokenMarkers );
+
 	};
 
   var runTests = function()
