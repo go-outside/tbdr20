@@ -101,7 +101,6 @@ var tbdCombat = tbdCombat || ( function()
     'all-for-one', 
     'angel-outfit', 
     'archery-target',
-    //new ones test is the name of the group of markers
     'target-arrows',
     'monster-grasp',
     'teleport',
@@ -159,29 +158,29 @@ var tbdCombat = tbdCombat || ( function()
 
   // Note that two word condition names will require rework for resolution of api command
   var conditions = [];
-  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'target-arrows' ) );
+  conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', Roll20.CustomTokenMarkers.TARGET_ARROWS ) );
   conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );conditions.push( createCondition( 'Haste', ' is moving with haste.', ' slows down.', 'sprint' ) );
   conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'snail' ) );
-  conditions.push( createCondition( 'Mirror', ' is has multiple images.', ' no longer has multiple images.', 'two-shadows' ) );
-  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', 'monster-grasp' ) );
-  conditions.push( createCondition( 'Blink', ' is blinks out of existance.', ' has returned.', 'teleport' ) );
-  conditions.push( createCondition( 'Weakness', ' is saped of strength.', ' strength returns.', 'slavery-whip' ) );
-  conditions.push( createCondition( 'True seeing', ' has true sight.', ' no longer has true sight.', 'eye-of-horus' ) );
+  conditions.push( createCondition( 'Mirror', ' has multiple images.', ' no longer has multiple images.', Roll20.CustomTokenMarkers.TWO_SHADOWS ) );
+  conditions.push( createCondition( 'Grappled', ' is grappled.', ' is no longer grappled.', Roll20.CustomTokenMarkers.MONSTER_GRASP ) );
+  conditions.push( createCondition( 'Blink', ' is blinks out of existance.', ' has returned.', Roll20.CustomTokenMarkers.TELEPORT ) );
+  conditions.push( createCondition( 'Weakness', ' is saped of strength.', ' strength returns.', Roll20.CustomTokenMarkers.SLAVERY_WHIP ) );
+  conditions.push( createCondition( 'True seeing', ' has true sight.', ' no longer has true sight.', Roll20.CustomTokenMarkers.EYE_OF_HORUS ) );
   conditions.push( createCondition( 'Charmed', ' has been charmed.', ' is thinking clearly again.', 'half-heart' ) );
-  conditions.push( createCondition( 'Hammer', ' is attacked by the hammer of the gods.', ' is no longer under siege.', 'hammer-drop' ) );
+  conditions.push( createCondition( 'Hammer', ' is attacked by the hammer of the gods.', ' is no longer under siege.', Roll20.CustomTokenMarkers.HAMMER_DROP ) );
   conditions.push( createCondition( 'Deafened', ' cannot hear.', ' can hear again.', 'broken-skull' ) );
   conditions.push( createCondition( 'Exhausted', ' is exhausted.', ' has energy again.', 'tread' ) );
   conditions.push( createCondition( 'Frightened', ' is frightened.', ' is no longer frightened.', 'screaming' ) );
-  conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', 'coma' ) );
-  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', 'invisible' ) );
+  conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', Roll20.CustomTokenMarkers.COMA ) );
+  conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', Roll20.CustomTokenMarkers.INVISIBLE ) );
   conditions.push( createCondition( 'Paralyzed', ' is paralyzed.', ' is no longer paralyzed.', 'back-pain' ) );
-  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', 'medusa-head' ) );
+  conditions.push( createCondition( 'Petrified', ' has turned to stone.', ' is flesh again.', Roll20.CustomTokenMarkers.MEDUSA_HEAD ) );
   conditions.push( createCondition( 'Poisoned', ' is poisoned.', ' is no longer poisoned.', 'radioactive' ) );
-  conditions.push( createCondition( 'Prone', ' is prone.', ' is no longer prone.', 'falling' ) );
-  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', 'imprisoned' ) );
-  conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', 'surprised' ) );
+  conditions.push( createCondition( 'Prone', ' is prone.', ' is no longer prone.', Roll20.CustomTokenMarkers.FALLING ) );
+  conditions.push( createCondition( 'Restrained', ' is restrained.', ' is no longer restrained.', Roll20.CustomTokenMarkers.IMPRISON ) );
+  conditions.push( createCondition( 'Stunned', ' is stunned.', ' is no longer stunned.', Roll20.CustomTokenMarkers.SURPRISED ) );
   conditions.push( createCondition( 'Unconscious', ' is unconscious.', ' is conscious.', 'skull' ) );
-  conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'fire' ) );
+  conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', Roll20.CustomTokenMarkers.FIRE ) );
   conditions.push( createCondition( 'Hex', ' is cursed.', ' is no longer cursed.', 'death-zone' ) );
   conditions.push( createCondition( 'Entangled', ' is entangled.', ' is free.', Roll20.CustomTokenMarkers.BEANSTALK ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
