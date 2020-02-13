@@ -185,6 +185,8 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Incapacitated', ' is incapacitated.', ' is no longer incapacitated.', Roll20.CustomTokenMarkers.COMA ) );
   conditions.push( createCondition( 'Invisible', ' is invisible.', ' is visible.', Roll20.CustomTokenMarkers.INVISIBLE ) );
   conditions.push( createCondition( 'Blind', ' is blinded.', ' now has sight.', 'bleeding-eye' ) );
+  conditions.push( createCondition( 'Absorb', ' is resistant to the energy.', ' is normal.', 'bolt-shield' ) );
+  conditions.push( createCondition( 'Shadow', ' is surrounded by shadows.', ' is normal.', 'half-haze' ) );
 
 
   // Return the condition matching name. Return undefined if not found
