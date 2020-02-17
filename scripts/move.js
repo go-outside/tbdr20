@@ -261,6 +261,7 @@ var tbdMove = tbdMove || ( function()
   };
 
   // Clear all script state
+  // May be called externally
   var clearAll = function()
   {
     if ( state.tbdMove.movers !== undefined ) {
@@ -538,6 +539,7 @@ var tbdMove = tbdMove || ( function()
 
   /// Create a mover for the playerId / graphicId pair
   /// Present the move menu to that player
+  /// Maybe be called externally
   var startMoveForPlayer = function( playerId, graphicId )
   {
     maybeCreateMover( playerId, graphicId );

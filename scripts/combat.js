@@ -215,12 +215,34 @@ var tbdCombat = tbdCombat || ( function()
     return turnOrder.filter( function( participant ) { return getObj( Roll20.Objects.GRAPHIC, participant.id ) !== undefined; } );
   };
 
+  // Sort array using compare to order elements
+  // Modifies array emplace
+  // compare function takes two elements from array and returns a boolean
+  // Stable sort
+  var bubbleSort = function( array, compare )
+  {
+    var changes = 1;
+    while ( changes > 0 ) {
+      changes = 0;
+      for ( var i = 1; i < array.length; ++i ) {
+        if ( compare( array[ i - 1 ], array[ i ] ) ) {
+          const temp = array[ i - 1 ];
+          array[ i - 1 ] = array[ i ];
+          array[ i ] = temp;
+          ++changes;
+        }
+      }
+    }
+  };
+
   // Sort turnOrder by initiative
   // Modifies contents of turnOrder
   var sortTurnOrder = function( turnOrder )
   {
     // pr is an awful parameter name forced by the r20 system. pr is initiative
-    turnOrder.sort( ( a, b ) => a.tookTurn == b.tookTurn ? ( b.pr - a.pr ) : ( a.tookTurn - b.tookTurn ) );
+    bubbleSort( turnOrder, ( a, b ) => a.tookTurn == b.tookTurn ? ( a.pr < b.pr ) : ( a.tookTurn > b.tookTurn ) );
+    // Default JavaScript array sort method is not stable
+    // turnOrder.sort( ( a, b ) => a.tookTurn == b.tookTurn ? ( b.pr - a.pr ) : ( a.tookTurn - b.tookTurn ) );
   };
 
   // Global state serialization
@@ -291,7 +313,7 @@ var tbdCombat = tbdCombat || ( function()
         sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
       }
       // Trigger move menu and initialization if that module is installed
-      if ( tbdMove !== undefined ) {
+      if ( tbdMove !== undefined && tbdMove.clearAll !== undefined && tbdMove.startMoveForPlayer !== undefined ) {
         tbdMove.clearAll();
         const controllers = participantControllers( participant );
         if ( controllers.length == 0 ) {
@@ -499,6 +521,7 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Remove all condition records from global state that match the given conditionId
+  // Called when remove action clicked in condition table
   var removeConditionRecord = function( conditionId )
   {
     // Update graphic and send recovery messages
@@ -629,6 +652,7 @@ var tbdCombat = tbdCombat || ( function()
           // Show option to advance turn during the round
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add Combatants</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat advance">Advance Turn</a>' )
+//          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat skipround">Skip Round</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
           + conditionDurations
@@ -713,6 +737,34 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
+  var skipCombatRound = function( turnOrder )
+  {
+
+    /*
+    state.tbdCombat.records = state.tbdCombat.records.filter(
+      function( record )
+      {
+        record.duration -= 1;
+        if ( record.duration <= 0 ) {
+          purgeConditionRecord( record );
+          return false;
+        } else {
+          return true;
+        }
+      } );
+    if ( state.tbdCombat.turn > 0 ) {
+      endRound();
+    } else {
+      state.tbdCombat.round++;
+      endRound();
+    }
+  
+  
+    turnOrder.forEach( participant => progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.AFTER_TURN ) )
+    */
+  }
+
+
   var showTokenMarkers = function( playerId )
   {
     const tokenMarkers = JSON.parse( Campaign().get( Roll20.Objects.TOKEN_MARKERS ) );
@@ -780,6 +832,9 @@ var tbdCombat = tbdCombat || ( function()
               showCombatMenu();
             } else if ( subcommand == 'setconditionduration'  && tokens.length == 3 ) {
               setPrototypeDuration( Number( tokens[ 2 ] ) );
+              showCombatMenu();
+            } else if ( subcommand == 'skipround' ) {
+              skipCombatRound( turnOrder );
               showCombatMenu();
             } else if ( subcommand == 'listmarkers' ) {
               showTokenMarkers( message.playerid );

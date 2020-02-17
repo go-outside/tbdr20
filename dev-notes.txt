@@ -4,6 +4,17 @@ Refactor Roll20 objects into Tbdr20 namespace and pull global use functions into
 
 Call !move for tokens in turn order
 
+New feature: deploy party onto map
+
+!combat clear all should clear movement if it is used
+!combat consider re-enabling the arrow on initiative page
+!combat stabilize sort order so that it does not get mixed up as initiative is advanced
+!combat refactor usage of state condition records -- copy records to temporary, modify, store temporary records -- as with calendar effects
+  !combat purgeConditionRecord should take array and record id? then splice array and disabled token markers
+
+!move refactor usage of mover state -- copy records to temporary, modify, store temporaries -- as with calendar effects
+
+!fc -- whisper player response 
 
 
 "be aware that Roll20 may throttle your use of state."
