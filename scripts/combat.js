@@ -411,6 +411,7 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Remove all entries from the Campaign 'turnorder'
+  // If tbdMove is used, clear movers as well
   var clearAll = function()
   {
     storeTurnOrder( [] );
@@ -418,6 +419,9 @@ var tbdCombat = tbdCombat || ( function()
     state.tbdCombat.round = 0;
     if ( state.tbdCombat.records !== undefined ) {
       state.tbdCombat.records.forEach( function( record ) { purgeConditionRecord( record ); } );
+    }
+    if ( tbdMove !== undefined && tbdMove.clearAll !== undefined ) {
+      tbdMove.clearAll();
     }
     state.tbdCombat.records = [];
     state.tbdCombat.conditionCount = 0;
