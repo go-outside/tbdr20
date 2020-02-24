@@ -2,17 +2,33 @@
 
 Refactor Roll20 objects into Tbdr20 namespace and pull global use functions into new script Tbdr20
 
-Call !move for tokens in turn order
-
 New feature: deploy party onto map
 
 !combat consider re-enabling the arrow on initiative page
 !combat refactor usage of state condition records -- copy records to temporary, modify, store temporary records -- as with calendar effects
   !combat purgeConditionRecord should take array and record id? then splice array and disabled token markers
 
-!move refactor usage of mover state -- copy records to temporary, modify, store temporaries -- as with calendar effects
-
 !fc -- whisper player response 
+
+
+
+
+sendPing(left, top, pageid, (optional) playerid, (optional) moveAll, (optional) visibleTo)
+ * Sends a "ping" the tabletop (the same as if a player holds down their mouse button). You must specify the top/left coordinates, and the pageid of the page to be pinged. You can optionally specify the ID of a player who performed the ping -- if you don't "api" will be assumed and the ping will be yellow.
+ * You can pass in "true" for the moveAll option if you want to move the players' views to that location as well.
+ * You can set the player IDs in visibleTo for the players who can see or be moved by the ping. This is presented as a single player ID, an array, or a comma-delimited string.
+
+on('chat:message', function(msg) {
+    var obj;
+    if (msg.type === 'api' && msg.content.indexOf('!ping') === 0) {
+        if (!msg.selected) return;
+        obj = getObj(msg.selected[0]._type, msg.selected[0]._id);
+        sendPing(obj.get('left'), obj.get('top'), obj.get('pageid'), msg.playerid, true); // center everyone on the selected token
+    }
+});
+
+// Ping everyone on this page to the same location.
+sendPing(300, 300, Campaign().get('playerpageid'), null, true);
 
 
 "be aware that Roll20 may throttle your use of state."
