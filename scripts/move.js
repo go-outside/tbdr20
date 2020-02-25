@@ -192,6 +192,7 @@ var tbdMove = tbdMove || ( function()
     const terrain = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move terrain">' + mover.terrain + ' Terrain</a>' );
     const start = mover === undefined ? makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move start">Start</a>' ) : '';
     const undo = mover === undefined || mover.circles.length < 2 ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move undo">Undo</a>' );
+    const ping = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move ping">Ping</a>' );
     const clear = mover === undefined ? '' : makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clear">Clear</a>' );
     const clearAll = playerIsGM( playerId ) 
       ? ( makeDiv( arrowStyle, '' ) + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!move clearall">Clear All</a>' ) )
@@ -205,6 +206,7 @@ var tbdMove = tbdMove || ( function()
         + dash
         + start
         + undo
+        + ping
         + clear
         + clearAll );
     const player = getObj( Roll20.Objects.PLAYER, playerId );
@@ -394,6 +396,24 @@ var tbdMove = tbdMove || ( function()
         path: JSON.stringify( path ) } );
     toFront( circleObject );
     return circleObject.get( Roll20.Objects.ID );
+  };
+
+  // Ping a selected mover token and move the controller's view to the ping
+  var pingMover = function( mover )
+  {
+    const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
+    if ( graphic !== undefined ) {
+      sendPing( 
+        graphic.get( Roll20.Objects.LEFT ), 
+        graphic.get( Roll20.Objects.TOP ), 
+        graphic.get( Roll20.Objects.PAGEID ), 
+        // Use the player's color for the ping? Seems to be black where it should be a different color
+        mover.playerId, 
+        // Move player's view to ping
+        true,
+        // Show the ping to only the player moving the token
+        mover.playerId );
+    }
   };
 
   // Clear existing graphics for mover
@@ -627,6 +647,12 @@ var tbdMove = tbdMove || ( function()
               undoMovement( mover );
               showMoveMenu( message.playerid, movers );
               storeMovers( movers );
+            }
+          } else if ( subcommand == 'ping' ) {
+            const movers = currentMovers();
+            const mover = findMoverByPlayer( message.playerid, movers );
+            if ( mover !== undefined ) {
+              pingMover( mover );
             }
           }
           if ( playerIsGM( message.playerid ) ) {

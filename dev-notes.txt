@@ -1,5 +1,7 @@
 
 
+Hold shift while pinging to focus everyone's view on that spot
+
 Refactor Roll20 objects into Tbdr20 namespace and pull global use functions into new script Tbdr20
 
 New feature: deploy party onto map
