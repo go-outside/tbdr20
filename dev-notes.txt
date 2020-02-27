@@ -1,4 +1,8 @@
 
+Concentration
+Add disadvantage roll button
+Text box for custom roll modifier
+
 
 Refactor Roll20 objects into Tbdr20 namespace and pull global use functions into new script Tbdr20
 
