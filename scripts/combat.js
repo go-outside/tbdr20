@@ -177,6 +177,51 @@ var tbdCombat = tbdCombat || ( function()
       duration: duration };
   };
 
+  /// Deep copy conditionRecord source and return the copy
+  var copyConditionRecord = function( source )
+  {
+    return { 
+      conditionId = source.conditionId,
+      graphicId = source.graphicId,
+      conditionName = source.conditionName,
+      duration = source.duration };
+  };
+
+  /// Deep copy contents of source onto destination
+  var copyCombat = function( source, destination )
+  {
+    destination.conditionCount = source.conditionCount;
+    destination.conditionPrototype = { name: source.conditionPrototype.name, duration: source.conditionPrototype.duration };
+    destination.round = source.round;
+    destination.records = source.records.map( record => copyConditionRecord( record ) );
+    destination.turn = source.turn;
+  }
+
+  /// Deep copy the combat object from state and return it
+  var currentCombat = function()
+  {
+    if ( state.tbdCombat === undefined ) {
+      return { 
+        conditionCount: 0, 
+        conditionPrototype: { name: 'Poisoned', duration: 2 }, 
+        records: [], 
+        round: 0, 
+        turn: 0 };
+    } else {
+      const combat = {};
+      copyCombat( state.tbdCombat, combat );
+      return combat;
+    }
+  };
+
+  // Deep copy combat into state.tbdCombat
+  var storeCombat = function( combat )
+  {
+    const combatCopy = {};
+    copyCombat( combat, combatCopy );
+    state.tbdCombat = combatCopy;
+  };
+  
   // Copy source into destination and return destination
   // source and destination are standard r20 turn order entries
   var copyParticipant = function( source, destination )
