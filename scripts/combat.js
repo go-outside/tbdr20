@@ -689,6 +689,7 @@ var tbdCombat = tbdCombat || ( function()
           // Show options to add combatants and start round when between rounds
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add Combatants</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat round">Start Round ' + upcomingRound + '</a>' )
+          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat skipround">Skip Round</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
           + conditionDurations
@@ -705,7 +706,7 @@ var tbdCombat = tbdCombat || ( function()
           // Show option to advance turn during the round
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add Combatants</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat advance">Advance Turn</a>' )
-//          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat skipround">Skip Round</a>' )
+          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat skipround">Skip to End of Round</a>' )
           + makeDiv( arrowStyle, '' )
           + conditionMenu
           + conditionDurations
@@ -746,14 +747,12 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Supply message and cleanup the combat turn.
-  // Show the combat menu
   // combat is from currentCombat()
   var endRound = function( combat )
   {
     sendChat( Roll20.ANNOUNCER, '/w gm Round ' + combat.round + ' is complete.' );
     // Set the turn to zero to indicate round is complete
     combat.turn = 0;
-    showCombatMenu( combat );
   };
 
   // Advance the turn order. Notify gm of round end.
@@ -782,6 +781,7 @@ var tbdCombat = tbdCombat || ( function()
       storeTurnOrder( turnOrder );
       if ( roundComplete( turnOrder ) ) {
         endRound( combat );
+        showCombatMenu( combat );
       } else {
         progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu( combat );
@@ -797,31 +797,30 @@ var tbdCombat = tbdCombat || ( function()
 
   var skipCombatRound = function( turnOrder, combat )
   {
-
-    /*
-    combat.records = combat.records.filter(
-      function( record )
-      {
-        record.duration -= 1;
-        if ( record.duration <= 0 ) {
-          purgeConditionRecord( record );
-          return false;
-        } else {
-          return true;
-        }
-      } );
     if ( combat.turn > 0 ) {
+      // The combat round has already started. Advance records for only those participants who haven't taken turn
+      turnOrder.forEach(
+        function( participant )
+        {
+          if ( ! participant.tookTurn ) {
+            progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.BEFORE_TURN );
+            progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.AFTER_TURN );
+            participant.tookTurn = true;
+          }
+        } );
       endRound( combat );
     } else {
       combat.round++;
+      turnOrder.forEach(
+        function( participant )
+        {
+          progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.BEFORE_TURN );
+          progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.AFTER_TURN );
+          participant.tookTurn = true;
+        } );
       endRound( combat );
     }
-  
-  
-    turnOrder.forEach( participant => progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.AFTER_TURN ) )
-    */
-  }
-
+  };
 
   var showTokenMarkers = function( playerId )
   {
@@ -876,7 +875,8 @@ var tbdCombat = tbdCombat || ( function()
           } else if ( subcommand == 'clear' ) {
             clearAll();
             showInitiativePage( false );
-            showCombatMenu( combat );
+            // combat is invalid after calling clearAll. Re-fetch currentCombat to show menu
+            showCombatMenu( currentCombat() );
           } else if ( subcommand == 'contract' ) {
             if ( message.selected === undefined || message.selected.length == 0 ) {
               sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for condition' );
@@ -898,7 +898,8 @@ var tbdCombat = tbdCombat || ( function()
             storeCombat( combat );
             showCombatMenu( combat );
           } else if ( subcommand == 'skipround' ) {
-            skipCombatRound( turnOrder );
+            skipCombatRound( turnOrder, combat );
+            storeCombat( combat );
             showCombatMenu( combat );
           } else if ( subcommand == 'listmarkers' ) {
             showTokenMarkers( message.playerid );
@@ -965,6 +966,7 @@ var tbdCombat = tbdCombat || ( function()
       if ( roundComplete( validatedTurnOrder ) ) {
         endRound( combat );
         storeCombat( combat );
+        showCombatMenu( combat );
       }
     }
   };
