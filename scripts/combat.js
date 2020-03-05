@@ -167,9 +167,9 @@ var tbdCombat = tbdCombat || ( function()
   // graphicId: the id of the graphic on which to associate the condition
   // conditionName: the name of condition
   // duration: the number of rounds remaining for the condition's effect
-  var createConditionRecord = function( graphicId, conditionName, duration )
+  // conditionId: unique identifier assigned to condition to selectively delete from condition table
+  var createConditionRecord = function( graphicId, conditionName, duration, conditionId )
   {
-    const conditionId = ++state.tbdCombat.conditionCount;
     return {
       conditionId: conditionId,
       graphicId: graphicId,
@@ -181,10 +181,10 @@ var tbdCombat = tbdCombat || ( function()
   var copyConditionRecord = function( source )
   {
     return { 
-      conditionId = source.conditionId,
-      graphicId = source.graphicId,
-      conditionName = source.conditionName,
-      duration = source.duration };
+      conditionId: source.conditionId,
+      graphicId: source.graphicId,
+      conditionName: source.conditionName,
+      duration: source.duration };
   };
 
   /// Deep copy contents of source onto destination
@@ -297,6 +297,17 @@ var tbdCombat = tbdCombat || ( function()
     Campaign().set( Roll20.Objects.TURN_ORDER, JSON.stringify( participants ) );
   };
 
+  // Remove all entries from the Campaign 'turnorder'
+  // If tbdMove is used, clear movers as well
+  var clearAll = function()
+  {
+    storeTurnOrder( [] );
+    state.tbdCombat = undefined;
+    if ( tbdMove !== undefined && tbdMove.clearAll !== undefined ) {
+      tbdMove.clearAll();
+    }
+  };
+
   // Return true if the round has completely cycled
   // Check to see that every entry has tookTurn == true
   var roundComplete = function( participants )
@@ -385,9 +396,11 @@ var tbdCombat = tbdCombat || ( function()
 
   // Check to see if the round has started
   // If round has started and originalCurrent turn is different than turnOrder[ 0 ], announce that turn order has changed
-  var maybeReannounceTurn = function( originalCurrentTurnParticipant, turnOrder )
+  // Does not modify combat
+  // combat is from currentCombat()
+  var maybeReannounceTurn = function( originalCurrentTurnParticipant, turnOrder, combat )
   {
-    if ( state.tbdCombat.turn > 0 ) {
+    if ( combat.turn > 0 ) {
       if ( originalCurrentTurnParticipant.id != turnOrder[ 0 ].id ) {
         sendChat( '', '/desc Current turn has been modified.' );
         announceTurn( turnOrder[ 0 ] );
@@ -453,23 +466,6 @@ var tbdCombat = tbdCombat || ( function()
         }
       }
     }
-  };
-
-  // Remove all entries from the Campaign 'turnorder'
-  // If tbdMove is used, clear movers as well
-  var clearAll = function()
-  {
-    storeTurnOrder( [] );
-    state.tbdCombat.turn = 0;
-    state.tbdCombat.round = 0;
-    if ( state.tbdCombat.records !== undefined ) {
-      state.tbdCombat.records.forEach( function( record ) { purgeConditionRecord( record ); } );
-    }
-    if ( tbdMove !== undefined && tbdMove.clearAll !== undefined ) {
-      tbdMove.clearAll();
-    }
-    state.tbdCombat.records = [];
-    state.tbdCombat.conditionCount = 0;
   };
 
   // Pass an array of selectObjects presumably from a message.selected
@@ -546,12 +542,12 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Pass an array of selectObjects presumably from a message.selected
-  // prototype is likely stored as state.tbdCombat.conditionPrototype
-  // Appends generated condition records to records
-  var appendConditionRecords = function( selectObjects, prototype, records )
+  // Appends generated condition records to combat.records
+  // combat is from currentCombat()
+  var appendConditionRecords = function( selectObjects, combat )
   {
-    const condition = findCondition( prototype.name );
-    const duration = prototype.duration;
+    const condition = findCondition( combat.conditionPrototype.name );
+    const duration = combat.conditionPrototype.duration;
     if ( condition !== undefined ) {
       selectObjects.map( 
         function( selectObject )
@@ -563,7 +559,8 @@ var tbdCombat = tbdCombat || ( function()
           const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
           if ( maybeCharacter !== undefined ) {
             sendConditionContractedMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
-            records.push( createConditionRecord( rollObject.id, condition.name, duration ) );
+            const conditionId = ++combat.conditionCount;
+            combat.records.push( createConditionRecord( rollObject.id, condition.name, duration, conditionId ) );
           }
         } );
     }
@@ -571,32 +568,38 @@ var tbdCombat = tbdCombat || ( function()
 
   // Remove all condition records from global state that match the given conditionId
   // Called when remove action clicked in condition table
-  var removeConditionRecord = function( conditionId )
+  // Modifies combat
+  // combat is from currentCombat()
+  var removeConditionRecord = function( conditionId, combat )
   {
     // Update graphic and send recovery messages
-    state.tbdCombat.records.forEach( 
+    combat.records.forEach( 
       function( record )
       {
         if ( record.conditionId == conditionId ) {
           purgeConditionRecord( record );
         }
       } );
-    state.tbdCombat.records = state.tbdCombat.records.filter( function( record ) { return record.conditionId != conditionId; } );
+    combat.records = combat.records.filter( function( record ) { return record.conditionId != conditionId; } );
   };
 
   // Store condition name for the prototype condition stored in global state
-  var setPrototypeCondition = function( conditionName )
+  // Modifies combat
+  // combat is from currentCombat()
+  var setPrototypeCondition = function( conditionName, combat )
   {
     const condition = findCondition( conditionName );
     if ( condition !== undefined ) {
-      state.tbdCombat.conditionPrototype.name = conditionName;
+      combat.conditionPrototype.name = conditionName;
     }
   };
 
   // Store condition duration for the prototype condition stored in global state
-  var setPrototypeDuration = function( conditionDuration )
+  // Modifies combat
+  // combat is from currentCombat()
+  var setPrototypeDuration = function( conditionDuration, combat )
   {
-    state.tbdCombat.conditionPrototype.duration = Math.max( 0, Math.floor( conditionDuration ) );
+    combat.conditionPrototype.duration = Math.max( 0, Math.floor( conditionDuration ) );
   };
 
   // Set the visibility state for the turn order window
@@ -654,7 +657,8 @@ var tbdCombat = tbdCombat || ( function()
   // 1. Setting up the turn. This is the state after using 'Clear' and before using 'Start Round'
   // 2. Combat rounds. Begins after 'Start Round' is pressed
   // The two modes offer a few different command options
-  var showCombatMenu = function()
+  // Combat is the reported combat state presumably returned by currentCombat()
+  var showCombatMenu = function( combat )
   {
     const divStyle = 'style="width: 189px; border: 1px solid black; background-color: #ffffff; padding: 5px;"'
     const tableStyle = 'style="text-align:center;"';
@@ -664,19 +668,19 @@ var tbdCombat = tbdCombat || ( function()
     const anchorStyle1 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 100px;';
     const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
 
-    const name = state.tbdCombat.conditionPrototype.name;
-    const duration = state.tbdCombat.conditionPrototype.duration;
+    const name = combat.conditionPrototype.name;
+    const duration = combat.conditionPrototype.duration;
     const conditionMenu = makeDiv( headStyle, 'Conditions' )
       + '<table style=\'margin-left:auto;margin-right:auto;\'>'
       + '<tr><td>Name </td><td><a ' + anchorStyle1 + '" href="!combat setconditionname ' + conditionComboBox() + '">' + name + '</a></td></tr>'
       + '<tr><td>Duration </td><td><a ' + anchorStyle1 + '" href="!combat setconditionduration ?{Duration?|' + duration + '}">' + duration + '</a></td></tr>'
       + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat contract">Apply Condition</a>' ) + '</td></tr>'
       + '</table>';
-    const conditionDurations = state.tbdCombat.records.length == 0
+    const conditionDurations = combat.records.length == 0
       ? ''
-      : makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Condition Durations' ) + conditionTable( state.tbdCombat.records );
-    if ( state.tbdCombat.turn == 0 ) {
-      const upcomingRound = String( state.tbdCombat.round + 1 );
+      : makeDiv( arrowStyle, '' ) + makeDiv( headStyle, 'Condition Durations' ) + conditionTable( combat.records );
+    if ( combat.turn == 0 ) {
+      const upcomingRound = String( combat.round + 1 );
       const menu = makeDiv(
         divStyle,
         makeDiv( headStyle, 'Combat' )
@@ -692,7 +696,7 @@ var tbdCombat = tbdCombat || ( function()
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
     } else {
-      const round = String( state.tbdCombat.round );
+      const round = String( combat.round );
       const menu = makeDiv(
         divStyle,
         makeDiv( headStyle, 'Combat' )
@@ -713,10 +717,12 @@ var tbdCombat = tbdCombat || ( function()
 
   // Start the next round of combat
   // turnOrder is the current participant array
-  var startRound = function( turnOrder )
+  // Modifies combat
+  // combat is from currentCombat()
+  var startRound = function( turnOrder, combat )
   {
     // A round can only be started if not currently on a participant turn
-    if ( state.tbdCombat.turn == 0 ) {
+    if ( combat.turn == 0 ) {
       turnOrder = purgeTurnOrder( turnOrder );
       // It is only useful to start a round of combat if there are participants
       if ( turnOrder.length > 0 ) {
@@ -725,11 +731,11 @@ var tbdCombat = tbdCombat || ( function()
         // Ensure the participants order is sorted
         sortTurnOrder( turnOrder );
         storeTurnOrder( turnOrder );
-        state.tbdCombat.turn++;
-        state.tbdCombat.round++;
-        sendChat( '', '/desc Start of Round ' + state.tbdCombat.round );
-        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.BEFORE_TURN );
-        showCombatMenu();
+        combat.turn++;
+        combat.round++;
+        sendChat( '', '/desc Start of Round ' + combat.round );
+        progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
+        showCombatMenu( combat );
         announceTurn( turnOrder[ 0 ] );
       } else {
         sendChat( Roll20.ANNOUNCER, '/w gm There are no combatants.' );
@@ -741,26 +747,29 @@ var tbdCombat = tbdCombat || ( function()
 
   // Supply message and cleanup the combat turn.
   // Show the combat menu
-  var endRound = function()
+  // combat is from currentCombat()
+  var endRound = function( combat )
   {
-    sendChat( Roll20.ANNOUNCER, '/w gm Round ' + state.tbdCombat.round + ' is complete.' );
+    sendChat( Roll20.ANNOUNCER, '/w gm Round ' + combat.round + ' is complete.' );
     // Set the turn to zero to indicate round is complete
-    state.tbdCombat.turn = 0;
-    showCombatMenu();
+    combat.turn = 0;
+    showCombatMenu( combat );
   };
 
   // Advance the turn order. Notify gm of round end.
   // Turn order cannot advance until round begins
   // turnOrder is the current participant array before cycling for the turn
-  var advanceTurnAndNotifyOfRoundEnd = function( turnOrder )
+  // Modifies combat
+  // combat is from currentCombat()
+  var advanceTurnAndNotifyOfRoundEnd = function( turnOrder, combat )
   {
-    // Calling startRound advances state.tbdCombat.turn from zero to one
+    // Calling startRound advances combat.turn from zero to one
     // Start the round before advancing turns
-    if ( state.tbdCombat.turn > 0 ) {
+    if ( combat.turn > 0 ) {
       if ( turnOrder[ 0 ].tookTurn == false ) {
         // Advance condition state only for participants who have not completed their turn yet
         // Ideally tookTurn will always be false at this point because other logic prevents advance on a stale turn
-        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.AFTER_TURN );
+        progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.AFTER_TURN );
       }
       // Mark turn taken for first combatant and resort the order
       if ( turnOrder.length > 0 ) {
@@ -772,12 +781,12 @@ var tbdCombat = tbdCombat || ( function()
       turnOrder = purgeTurnOrder( turnOrder );
       storeTurnOrder( turnOrder );
       if ( roundComplete( turnOrder ) ) {
-        endRound();
+        endRound( combat );
       } else {
-        progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.BEFORE_TURN );
-        showCombatMenu();
+        progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
+        showCombatMenu( combat );
         announceTurn( turnOrder[ 0 ] );
-        state.tbdCombat.turn++;
+        combat.turn++;
       }
     } else {
       // Store turn order here for case where turn was advanced via initative page and needs to be reset
@@ -786,11 +795,11 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
-  var skipCombatRound = function( turnOrder )
+  var skipCombatRound = function( turnOrder, combat )
   {
 
     /*
-    state.tbdCombat.records = state.tbdCombat.records.filter(
+    combat.records = combat.records.filter(
       function( record )
       {
         record.duration -= 1;
@@ -801,15 +810,15 @@ var tbdCombat = tbdCombat || ( function()
           return true;
         }
       } );
-    if ( state.tbdCombat.turn > 0 ) {
-      endRound();
+    if ( combat.turn > 0 ) {
+      endRound( combat );
     } else {
-      state.tbdCombat.round++;
-      endRound();
+      combat.round++;
+      endRound( combat );
     }
   
   
-    turnOrder.forEach( participant => progressConditionRecord( turnOrder[ 0 ], state.tbdCombat.records, WhenToAdvanceCondition.AFTER_TURN ) )
+    turnOrder.forEach( participant => progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.AFTER_TURN ) )
     */
   }
 
@@ -829,90 +838,70 @@ var tbdCombat = tbdCombat || ( function()
     sendChat( Roll20.ANNOUNCER, '/w "' + player.get( Roll20.Objects.DISPLAY_NAME ) + '" ' + content );
   };
 
-  // Ping a selected token and move the view of all players to the ping
-  // selectedObject is an item from the selected array member of a chat message
-  var showFocusingPing = function( singleSelectedObject )
-  {
-    const targetObject = getObj( singleSelectedObject._type, singleSelectedObject._id );
-    if ( targetObject !== undefined ) {
-      sendPing( 
-        targetObject.get('left'), 
-        targetObject.get('top'), 
-        targetObject.get('pageid'), 
-        // Use the system ping color
-        null, 
-        // Move view of all players to ping
-        true,
-        // Show the ping to everyone
-        undefined );
-    }
-  };
-
   // Delegate resolution of chat event
   var handleChatMessage = function( message )
   {
     if ( message.type === 'api' ) {
       const tokens = message.content.split( ' ' );
       const command = tokens[ 0 ];
-      if ( playerIsGM( message.playerid ) ) {
-        if ( command === '!combat' ) {
-          var turnOrder = currentTurnOrder();
-          if ( tokens.length == 1 ) {
-            storeTurnOrder( turnOrder );
-            showCombatMenu();
-          } else {
-            const subcommand = tokens[ 1 ];
-            if ( subcommand == 'add' ) {
-              // allow addition of combatants only at the top of the round
-              if ( message.selected === undefined || message.selected.length == 0 ) {
-                sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for initiative' );
-              } else {
-                showInitiativePage( true );
-                const originalCurrentTurn = turnOrder[ 0 ];
-                // appendAndUpdateParticipants modifies contents of turnOrder
-                appendAndUpdateParticipants( collectSelectedParticipants( message.selected ), turnOrder );
-                sortTurnOrder( turnOrder );
-                showCombatMenu();
-                // If round has already started, this addition might set the current turn
-                maybeReannounceTurn( originalCurrentTurn, turnOrder );
-                storeTurnOrder( turnOrder );
-              }
-            } else if ( subcommand == 'round' ) {
-              startRound( turnOrder );
-            } else if ( subcommand == 'advance' ) {
-              advanceTurnAndNotifyOfRoundEnd( turnOrder );
-            } else if ( subcommand == 'clear' ) {
-              clearAll();
-              showInitiativePage( false );
-              showCombatMenu();
-            } else if ( subcommand == 'contract' ) {
-              if ( message.selected === undefined || message.selected.length == 0 ) {
-                sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for condition' );
-              } else {
-                appendConditionRecords( message.selected, state.tbdCombat.conditionPrototype, state.tbdCombat.records );
-                showCombatMenu();
-              }
-            } else if ( subcommand == 'removecondition' && tokens.length == 3 ) {
-              removeConditionRecord( Number( tokens[ 2 ] ) );
-              showCombatMenu();
-            } else if ( subcommand == 'setconditionname' && tokens.length == 3 ) {
-              setPrototypeCondition( tokens[ 2 ] );
-              showCombatMenu();
-            } else if ( subcommand == 'setconditionduration'  && tokens.length == 3 ) {
-              setPrototypeDuration( Number( tokens[ 2 ] ) );
-              showCombatMenu();
-            } else if ( subcommand == 'skipround' ) {
-              skipCombatRound( turnOrder );
-              showCombatMenu();
-            } else if ( subcommand == 'listmarkers' ) {
-              showTokenMarkers( message.playerid );
+      if ( command === '!combat' && playerIsGM( message.playerid ) ) {
+        const combat = currentCombat();
+        var turnOrder = currentTurnOrder();
+        if ( tokens.length == 1 ) {
+          storeTurnOrder( turnOrder );
+          showCombatMenu( combat );
+        } else {
+          const subcommand = tokens[ 1 ];
+          if ( subcommand == 'add' ) {
+            // allow addition of combatants only at the top of the round
+            if ( message.selected === undefined || message.selected.length == 0 ) {
+              sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for initiative' );
+            } else {
+              showInitiativePage( true );
+              const originalCurrentTurn = turnOrder[ 0 ];
+              // appendAndUpdateParticipants modifies contents of turnOrder
+              appendAndUpdateParticipants( collectSelectedParticipants( message.selected ), turnOrder );
+              sortTurnOrder( turnOrder );
+              showCombatMenu( combat );
+              // If round has already started, this addition might set the current turn
+              maybeReannounceTurn( originalCurrentTurn, turnOrder, combat );
+              storeTurnOrder( turnOrder );
             }
-          }
-        } else if ( command === '!ping' ) {
-          if ( message.selected === undefined || message.selected.length == 0 ) {
-            sendChat( Roll20.ANNOUNCER, '/w gm Ping requires selected object for focus' );
-          } else {
-            showFocusingPing( message.selected[ 0 ] );
+          } else if ( subcommand == 'round' ) {
+            startRound( turnOrder, combat );
+            storeCombat( combat );
+          } else if ( subcommand == 'advance' ) {
+            advanceTurnAndNotifyOfRoundEnd( turnOrder, combat );
+            storeCombat( combat );
+          } else if ( subcommand == 'clear' ) {
+            clearAll();
+            showInitiativePage( false );
+            showCombatMenu( combat );
+          } else if ( subcommand == 'contract' ) {
+            if ( message.selected === undefined || message.selected.length == 0 ) {
+              sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for condition' );
+            } else {
+              appendConditionRecords( message.selected, combat );
+              storeCombat( combat );
+              showCombatMenu( combat );
+            }
+          } else if ( subcommand == 'removecondition' && tokens.length == 3 ) {
+            removeConditionRecord( Number( tokens[ 2 ] ), combat );
+            storeCombat( combat );
+            showCombatMenu( combat );
+          } else if ( subcommand == 'setconditionname' && tokens.length == 3 ) {
+            setPrototypeCondition( tokens[ 2 ], combat );
+            storeCombat( combat );
+            showCombatMenu( combat );
+          } else if ( subcommand == 'setconditionduration'  && tokens.length == 3 ) {
+            setPrototypeDuration( Number( tokens[ 2 ] ), combat );
+            storeCombat( combat );
+            showCombatMenu( combat );
+          } else if ( subcommand == 'skipround' ) {
+            skipCombatRound( turnOrder );
+            showCombatMenu( combat );
+          } else if ( subcommand == 'listmarkers' ) {
+            showTokenMarkers( message.playerid );
           }
         }
       }
@@ -954,6 +943,7 @@ var tbdCombat = tbdCombat || ( function()
   {
     const newTurnOrder = JSON.parse( newCampaign.get( Roll20.Objects.TURN_ORDER ) );
     const originalTurnOrder = JSON.parse( oldCampaign[ Roll20.Objects.TURN_ORDER ] );
+    const combat = currentCombat();
     if ( newTurnOrder.length == originalTurnOrder.length ) {
       // Assume that a same number of entries implies the identity of entries remains the same.
       // Turn order cannot be modified outside of the combat panel.
@@ -962,7 +952,7 @@ var tbdCombat = tbdCombat || ( function()
       sortTurnOrder( newTurnOrder );
       storeTurnOrder( newTurnOrder );
       // If round has already started, this addition might set a new current turn
-      maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder );
+      maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder, combat );
     } else {
       // Handle addition of participant via right-click, add turn from map
       const validatedTurnOrder = newTurnOrder.filter( function( participant ) { return validateParticipant( participant ); } );
@@ -970,10 +960,11 @@ var tbdCombat = tbdCombat || ( function()
       sortTurnOrder( validatedTurnOrder );
       storeTurnOrder( validatedTurnOrder );
       // If round has already started, this addition might set a new current turn
-      maybeReannounceTurn( originalTurnOrder[ 0 ], validatedTurnOrder );
+      maybeReannounceTurn( originalTurnOrder[ 0 ], validatedTurnOrder, combat );
       // If the last participant was removed, end the round
       if ( roundComplete( validatedTurnOrder ) ) {
-        endRound();
+        endRound( combat );
+        storeCombat( combat );
       }
     }
   };
@@ -982,19 +973,6 @@ var tbdCombat = tbdCombat || ( function()
   {
     // Ensure the combatTokenMarkers array is filled
     fillTokenMarkers();
-    if ( state.tbdCombat === undefined ) {
-      state.tbdCombat = {};
-      state.tbdCombat.turn = 0;
-      state.tbdCombat.round = 0;
-      state.tbdCombat.records = [];
-      // The prototype stores input parameters for condition assignment
-      state.tbdCombat.conditionPrototype = {
-        name: 'Poisoned',
-        duration: 2 };
-    }
-    if ( state.tbdCombat.conditionCount === undefined ) {
-      state.tbdCombat.conditionCount = 0;
-    }
 
     on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
     on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
