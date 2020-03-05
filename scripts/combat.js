@@ -233,6 +233,15 @@ var tbdCombat = tbdCombat || ( function()
     return destination;
   };
 
+  // Return true if participant a matches participant b
+  var participantsMatch = function( a, b )
+  {
+    return a.id == b.id
+      && a.pr == b.pr
+      && a.custom == b.custom
+      && a.tookTurn == b.tookTurn;
+  };
+
   // Return a new Participant object to insert into 'turnorder'
   var createParticipant = function( graphicId, initiative )
   {
@@ -935,6 +944,16 @@ var tbdCombat = tbdCombat || ( function()
     return false;
   };
 
+  // Return true if turnOrderB matches turnOrderA if it was advanced once
+  var turnOrderAdvanced = function( turnOrderA, turnOrderB )
+  {
+    return turnOrderA.length == turnOrderB.length && turnOrderB.every(
+      function( participant, index )
+      {
+        return participantsMatch( participant, turnOrderA[ ( index + 1 ) % turnOrderA.length ] );
+      } );
+  };
+
   // The function arguents for this handler are a little bizarre.
   // There are two campaign inputs that look the same but actually have different type
   // It appears that newCampaign is a full fledged Roll20 object with a .get() method for properties
@@ -946,14 +965,19 @@ var tbdCombat = tbdCombat || ( function()
     const originalTurnOrder = JSON.parse( oldCampaign[ Roll20.Objects.TURN_ORDER ] );
     const combat = currentCombat();
     if ( newTurnOrder.length == originalTurnOrder.length ) {
-      // Assume that a same number of entries implies the identity of entries remains the same.
-      // Turn order cannot be modified outside of the combat panel.
-      // However modification of initiative values is allowed here.
-      // Re-sort to keep original order respecting initiative value change
-      sortTurnOrder( newTurnOrder );
-      storeTurnOrder( newTurnOrder );
-      // If round has already started, this addition might set a new current turn
-      maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder, combat );
+      if ( turnOrderAdvanced( originalTurnOrder, newTurnOrder ) ) {
+        advanceTurnAndNotifyOfRoundEnd( originalTurnOrder, combat );
+        storeCombat( combat );
+      } else {
+        // Assume that a same number of entries implies the identity of entries remains the same.
+        // Turn order cannot be modified outside of the combat panel.
+        // However modification of initiative values is allowed here.
+        // Re-sort to keep original order respecting initiative value change
+        sortTurnOrder( newTurnOrder );
+        storeTurnOrder( newTurnOrder );
+        // If round has already started, this addition might set a new current turn
+        maybeReannounceTurn( originalTurnOrder[ 0 ], newTurnOrder, combat );
+      }
     } else {
       // Handle addition of participant via right-click, add turn from map
       const validatedTurnOrder = newTurnOrder.filter( function( participant ) { return validateParticipant( participant ); } );
