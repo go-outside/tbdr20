@@ -117,7 +117,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'True-seeing', ' has true sight.', ' no longer has true sight.', 'eye-of-horus' ) );
   conditions.push( createCondition( 'Bless', ' is blessed.', ' is no longer blessed.', 'angel-outfit' ) );
   conditions.push( createCondition( 'Chill', ' feels touched by Death.', ' is no longer touched by Death.', 'skeletal-hand' ) );
-  conditions.push( createCondition( 'Transform', ' is transforms.', ' transforms back.', 'overdrive'));
+  conditions.push( createCondition( 'Transform', ' is transformed.', ' transforms back.', 'overdrive'));
   conditions.push( createCondition( 'Power', ' glows with power.', ' no longer glowing.', 'aura'));
   conditions.push( createCondition( 'Confused', ' is very confused.', ' is no longer confused.', 'stoned-skull' ) );
   conditions.push( createCondition( 'Faerie-Fire', ' is surrounded with fire.', ' is no longer illuminated.', 'flaming-claw' ));
