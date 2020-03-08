@@ -58,7 +58,7 @@ var tbdCalendar = tbdCalendar || ( function()
 
   // Create a new tbd effect object
   // description is a user readable string
-  // expiration is a date value
+  // expiration is a date value, a number
   // visbility is one of EffectVisibility.GM or PUBLIC
   var createEffect = function( description, expiration, visibility )
   {
@@ -95,14 +95,14 @@ var tbdCalendar = tbdCalendar || ( function()
     const effects = state.tbdCalendar !== undefined && state.tbdCalendar.effects !== undefined
       ? state.tbdCalendar.effects
       : [];
-    // Deep copy the effects array
+    // Deep copy the effects array and sort order from greatest duration to least duration
     return effects.map( 
       function( effect )
       {
         const copy = {};
         copyEffect( effect, copy );
         return copy;
-      } ).sort( ( a, b ) => a.expiration < b.expiration );
+      } ).sort( ( a, b ) => b.expiration - a.expiration );
   };
 
   // Deep copy effects array into state.tbdCalendar.effects
@@ -511,7 +511,7 @@ var tbdCalendar = tbdCalendar || ( function()
   var extractDuration = function( rawDuration )
   {
     const match = rawDuration.match( /\s*([0-9]+\.?[0-9]*)\s*([a-zA-z]+)/ );
-    if ( match.length == 3 ) {
+    if ( match != null && match.length == 3 ) {
       const value = Number( match[ 1 ] );
       const units = match[ 2 ].toLowerCase();
       if ( [ 'm', 'min', 'minute', 'minutes' ].includes( units ) ) {
