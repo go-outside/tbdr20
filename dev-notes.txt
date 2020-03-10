@@ -1,10 +1,8 @@
 
 Medium priority:
-Sort Effects in chronological order
-Detect cycling of combat turn before round starts and whisper warning to GM
 enable manual concentration roll for players
 
-bad Effect input is ignored without warning or error message
+consider prompt to start round? if advanced. Cannot bring up pop-up. It would have to be in chat
 
 Low priority:
 Tongues -- can language proficiencies be pulled from character sheets?

@@ -58,6 +58,31 @@ var Concentration = Concentration || (function() {
       let message;
 
       if (command == state[state_name].config.command) {
+        if ( extracommand == 'roll' ) {
+          let represents = args[0],
+              DC = parseInt(args[1], 10),
+              net_modifier = parseInt(args[2], 10),
+              name = args[3],
+              target = args[4];
+
+          roll(represents, DC, net_modifier, name, target);
+        } else if ( extracommand == kAdvantage ) {
+          let represents_a = args[0],
+              DC_a = parseInt(args[1], 10),
+              net_modifier_a = parseInt(args[2], 10),
+              name_a = args[3],
+              target_a = args[4];
+
+          roll(represents_a, DC_a, net_modifier_a, name_a, target_a, kAdvantage);
+        } else if ( extracommand == kDisadvantage ) {
+          let represents_d = args[0],
+              DC_d = parseInt(args[1], 10),
+              net_modifier_d = parseInt(args[2], 10),
+              name_d = args[3],
+              target_d = args[4];
+
+          roll(represents_d, DC_d, net_modifier_d, name_d, target_d, kDisadvantage);
+        } else {
           if(playerIsGM(msg.playerid)){
               switch(extracommand){
                   case 'reset':
@@ -99,36 +124,6 @@ var Concentration = Concentration || (function() {
                       sendAdvantageMenu();
                   break;
 
-                  case 'roll':
-                      let represents = args[0],
-                          DC = parseInt(args[1], 10),
-                          net_modifier = parseInt(args[2], 10),
-                          name = args[3],
-                          target = args[4];
-
-                      roll(represents, DC, net_modifier, name, target);
-                  break;
-
-                  case kAdvantage:
-                      let represents_a = args[0],
-                          DC_a = parseInt(args[1], 10),
-                          net_modifier_a = parseInt(args[2], 10),
-                          name_a = args[3],
-                          target_a = args[4];
-
-                      roll(represents_a, DC_a, net_modifier_a, name_a, target_a, kAdvantage);
-                  break;
-
-                  case kDisadvantage:
-                      let represents_d = args[0],
-                          DC_d = parseInt(args[1], 10),
-                          net_modifier_d = parseInt(args[2], 10),
-                          name_d = args[3],
-                          target_d = args[4];
-
-                      roll(represents_d, DC_d, net_modifier_d, name_d, target_d, kDisadvantage);
-                  break;
-
                   default:
                       if(msg.selected && msg.selected.length){
                           msg.selected.forEach(s => {
@@ -149,6 +144,7 @@ var Concentration = Concentration || (function() {
                   });
               }
           }
+        } // else general command
       }
   },
 
