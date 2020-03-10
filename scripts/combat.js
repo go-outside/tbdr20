@@ -106,7 +106,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'target-arrows' ) );
   conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );
   conditions.push( createCondition( 'Dodging', ' starts dodging.', ' is no longer dodging.', 'dodging', WhenToAdvanceCondition.BEFORE_TURN ) );
-  conditions.push( createCondition( 'Ready', ' readies an action.', ' is no longer ready.', 'stopwatch', WhenToAdvanceCondition.BEFORE_TURN ) );
+  conditions.push( createCondition( 'Ready', ' readies an action.', ' is no longer ready.', 'strong', WhenToAdvanceCondition.BEFORE_TURN ) );
   conditions.push( createCondition( 'Haste', ' is fast moving.', ' is back to normal speed.', 'sprint' ) );
   conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'snail' ) );
   conditions.push( createCondition( 'Mirror', ' has multiple images.', ' no longer has multiple images.', 'two-shadows' ) );
