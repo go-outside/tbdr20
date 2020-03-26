@@ -1,6 +1,8 @@
 
-Medium priority:
-enable manual concentration roll for players
+spell line of sight / blast dimension / point of origin tool
+mounts
+consider setting no-wrap to calendar effects durations in display table
+move -- allow multiple movers for a token?
 
 consider prompt to start round? if advanced. Cannot bring up pop-up. It would have to be in chat
 

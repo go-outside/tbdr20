@@ -204,6 +204,11 @@ var Concentration = Concentration || (function() {
           token.set(attributes);
           message = (is_concentrating) ? '<p style="font-size: 9pt; color: red;">Previous concentration cancelled.</p>' : '';
           message += '<b>'+character_name+'</b> is now concentrating on <b>'+spell_name+'</b>.';
+
+          if ( tbdCombat !== undefined && tbdCombat.assignConcentration ) {
+            tbdCombat.assignConcentration( token.get('_id'), spell_name );
+          }
+
       });
 
       if(target === 'character'){
@@ -345,8 +350,14 @@ var Concentration = Concentration || (function() {
   },
 
   removeMarker = (represents, type='graphic') => {
-      findObjs({ type, represents }).forEach(o => {
-          o.set('status_'+state[state_name].config.statusmarker, false);
+      findObjs({ type, represents }).forEach( tokenObject => {
+        tokenObject.set('status_'+state[state_name].config.statusmarker, false);
+
+        if ( tbdCombat !== undefined && tbdCombat.assignConcentration ) {
+          // Clear the concentration assignment in combat
+          tbdCombat.assignConcentration( tokenObject.get('_id') );
+        }
+
       });
   },
 
