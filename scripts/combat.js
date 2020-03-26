@@ -944,7 +944,7 @@ var tbdCombat = tbdCombat || ( function()
     return false;
   };
 
-  // Return true if turnOrderB matches turnOrderA if it was advanced once
+  // Return true if turnOrderB matches turnOrderA if turnOrderA was advanced once
   var turnOrderAdvanced = function( turnOrderA, turnOrderB )
   {
     return turnOrderA.length == turnOrderB.length && turnOrderB.every(
