@@ -1,4 +1,12 @@
 
+concentration causes out of combat spam -- maybe if !concentration is in chat
+peel duration: concentration and length of time from spells cast
+track concentration duration
+
+elevation / flight / dynamic lighting
+See One-Way Dynamic Lighting
+Different color lines for different heights?
+
 spell line of sight / blast dimension / point of origin tool
 mounts
 consider setting no-wrap to calendar effects durations in display table
