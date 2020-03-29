@@ -560,17 +560,20 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Reduce duration count for concentration
+  // Progress downtick is called after turn -- so a spell cast leads to an immediate a downtick
+  // Duration represents the number of full combat rounds remaining
   var progressConcentration = function( participant )
   {
     if ( participant.concentration !== undefined ) {
       if ( participant.duration === undefined ) {
         sendConcentrationDurationElapsedMessage( participant );
       } else {
-        participant.duration -= 1;
         if ( participant.duration < 1 ) {
           sendConcentrationDurationElapsedMessage( participant );
           participant.concentration = undefined;
           participant.duration = undefined;
+        } else {
+          participant.duration -= 1;
         }
       }
     }
@@ -583,7 +586,7 @@ var tbdCombat = tbdCombat || ( function()
     if ( rollObject !== undefined ) {
       const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
       const characterName = maybeCharacter === undefined ? 'Unknown' : maybeCharacter.get( Roll20.Objects.NAME );
-      sendChat( '', '/desc ' + characterName + '\'s ' + participant.concentration + ' expires at end of turn.' );
+      sendChat( '', '/desc ' + characterName + '\'s ' + participant.concentration + ' expired.' );
     }
   }
 
@@ -839,7 +842,6 @@ var tbdCombat = tbdCombat || ( function()
         combat.turn++;
         combat.round++;
         sendChat( '', '/desc Start of Round ' + combat.round );
-        progressConcentration( turnOrder[ 0 ] );
         progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu( combat, turnOrder );
         announceTurn( turnOrder[ 0 ] );
@@ -873,8 +875,8 @@ var tbdCombat = tbdCombat || ( function()
     // Start the round before advancing turns
     if ( combat.turn > 0 ) {
       if ( turnOrder[ 0 ].tookTurn == false ) {
+        progressConcentration( turnOrder[ 0 ] );
         // Advance condition state only for participants who have not completed their turn yet
-        // Ideally tookTurn will always be false at this point because other logic prevents advance on a stale turn
         progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.AFTER_TURN );
       }
       // Mark turn taken for first combatant and resort the order
@@ -889,7 +891,6 @@ var tbdCombat = tbdCombat || ( function()
         endRound( combat );
         showCombatMenu( combat, turnOrder );
       } else {
-        progressConcentration( turnOrder[ 0 ] );
         progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu( combat, turnOrder );
         announceTurn( turnOrder[ 0 ] );
@@ -1070,6 +1071,7 @@ var tbdCombat = tbdCombat || ( function()
     if ( newTurnOrder.length == originalTurnOrder.length ) {
       if ( turnOrderAdvanced( originalTurnOrder, newTurnOrder ) ) {
         advanceTurnAndNotifyOfRoundEnd( originalTurnOrder, combat );
+        storeTurnOrder( originalTurnOrder );
         storeCombat( combat );
       } else {
         // Assume that a same number of entries implies the identity of entries remains the same.
