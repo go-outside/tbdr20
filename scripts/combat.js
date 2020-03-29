@@ -231,6 +231,7 @@ var tbdCombat = tbdCombat || ( function()
     destination.custom = source.custom;
     destination.tookTurn = source.tookTurn;
     destination.concentration = source.concentration;
+    destination.duration = source.duration;
     return destination;
   };
 
@@ -241,22 +242,33 @@ var tbdCombat = tbdCombat || ( function()
       && a.pr == b.pr
       && a.custom == b.custom
       && a.tookTurn == b.tookTurn
-      && a.concentration == b.concentration;
+      && a.concentration == b.concentration
+      && a.duration == b.duration;
   };
+
+  // A compare function for participant sorting
+  var participantCompare = function( a, b )
+  {
+    return a.tookTurn == b.tookTurn 
+      ? ( a.pr == b.pr ? a.id < b.id : a.pr < b.pr )
+      : a.tookTurn > b.tookTurn;
+  }
 
   // Return a new Participant object to insert into 'turnorder'
   // tookTurn is true when the participant has taken his turn this round
   // concentration is a string when the participant is concentrating on a spell
   // concentration as a string is the concentrated spell name
+  // duration is a number indicating remaining turns when not undefined
   var createParticipant = function( graphicId, initiative )
   {
-    return { id: graphicId, pr: initiative, tookTurn: false, concentration: undefined };
+    return { id: graphicId, pr: initiative, tookTurn: false, concentration: undefined, duration: undefined };
   };
   
   // Takes a graphicId used to pair to an existing participant
   // Takes a string or undefined for spell.
+  // Takes a duration or undefined for a number of turns
   // If spell is a strign with length > 1, then concentration is assigned. Otherwise concentration is set undefined
-  var assignParticipantConcentration = function( graphicId, spell )
+  var assignParticipantConcentration = function( graphicId, spell, duration )
   {
     var turnOrder = currentTurnOrder();
     const participant = turnOrder.find( participant => participant.id == graphicId );
@@ -265,8 +277,10 @@ var tbdCombat = tbdCombat || ( function()
     } else {
       if ( spell === undefined || spell.length === undefined || spell.length < 1 ) {
         participant.concentration = undefined;
+        participant.duration = undefined;
       } else {
         participant.concentration = spell;
+        participant.duration = duration;
       }
     }
     storeTurnOrder( turnOrder );
@@ -318,7 +332,7 @@ var tbdCombat = tbdCombat || ( function()
   var sortTurnOrder = function( turnOrder )
   {
     // pr is an awful parameter name forced by the r20 system. pr is initiative
-    bubbleSort( turnOrder, ( a, b ) => a.tookTurn == b.tookTurn ? ( a.pr < b.pr ) : ( a.tookTurn > b.tookTurn ) );
+    bubbleSort( turnOrder, participantCompare );
     // Default JavaScript array sort method is not stable
     // turnOrder.sort( ( a, b ) => a.tookTurn == b.tookTurn ? ( b.pr - a.pr ) : ( a.tookTurn - b.tookTurn ) );
   };
@@ -545,6 +559,34 @@ var tbdCombat = tbdCombat || ( function()
     return currentParticipants;
   };
 
+  // Reduce duration count for concentration
+  var progressConcentration = function( participant )
+  {
+    if ( participant.concentration !== undefined ) {
+      if ( participant.duration === undefined ) {
+        sendConcentrationDurationElapsedMessage( participant );
+      } else {
+        participant.duration -= 1;
+        if ( participant.duration < 1 ) {
+          sendConcentrationDurationElapsedMessage( participant );
+          participant.concentration = undefined;
+          participant.duration = undefined;
+        }
+      }
+    }
+  }
+
+  // Send message to chat notifying of impending spell expiration
+  var sendConcentrationDurationElapsedMessage = function( participant )
+  {
+    const rollObject = getObj( Roll20.Objects.GRAPHIC, participant.id );
+    if ( rollObject !== undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+      const characterName = maybeCharacter === undefined ? 'Unknown' : maybeCharacter.get( Roll20.Objects.NAME );
+      sendChat( '', '/desc ' + characterName + '\'s ' + participant.concentration + ' expires at end of turn.' );
+    }
+  }
+
   // Reduce duration count for condition records applying to participant
   // If a record is reduced to zero duration, send recovery message and remove from records
   // whenToAdvance is one of WhenToAdvanceCondition enum
@@ -696,8 +738,8 @@ var tbdCombat = tbdCombat || ( function()
           if ( rollObject !== undefined ) {
             const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
             const characterName = maybeCharacter === undefined ? 'Unknown' : maybeCharacter.get( Roll20.Objects.NAME );
-            content = content + '<tr><td>' + characterName + '</td><td>'
-              + '<td><b>' + participant.concentration + '</b></td></tr>';
+            content = content + '<tr><td>' + characterName + '<br><b>' + participant.concentration + '</b></td>'
+              + '<td><b>' + participant.duration + '</b></td></tr>';
           }
         }
       } );
@@ -716,7 +758,7 @@ var tbdCombat = tbdCombat || ( function()
   // Combat is the reported combat state presumably returned by currentCombat()
   var showCombatMenu = function( combat, turnOrder )
   {
-    const divStyle = 'style="width: 189px; border: 1px solid black; background-color: #ffffff; padding: 5px;"'
+    const divStyle = 'style="width: 220px; border: 1px solid black; background-color: #ffffff; padding: 5px;"'
     const tableStyle = 'style="text-align:center;"';
     const arrowStyle = 'style="border: none; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 195px solid ' + blueColor + '; margin-bottom: 2px; margin-top: 2px;"';
     const headStyle = 'style="color: ' + blueColor + '; font-size: 18px; text-align: left; font-variant: small-caps; font-family: Times, serif;"';
@@ -780,6 +822,7 @@ var tbdCombat = tbdCombat || ( function()
 
   // Start the next round of combat
   // turnOrder is the current participant array
+  // Modifies turnOrder
   // Modifies combat
   // combat is from currentCombat()
   var startRound = function( turnOrder, combat )
@@ -793,13 +836,14 @@ var tbdCombat = tbdCombat || ( function()
         turnOrder.forEach( function( participant ) { participant.tookTurn = false; } );
         // Ensure the participants order is sorted
         sortTurnOrder( turnOrder );
-        storeTurnOrder( turnOrder );
         combat.turn++;
         combat.round++;
         sendChat( '', '/desc Start of Round ' + combat.round );
+        progressConcentration( turnOrder[ 0 ] );
         progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu( combat, turnOrder );
         announceTurn( turnOrder[ 0 ] );
+        storeTurnOrder( turnOrder );
       } else {
         sendChat( Roll20.ANNOUNCER, '/w gm There are no combatants.' );
       }
@@ -820,6 +864,7 @@ var tbdCombat = tbdCombat || ( function()
   // Advance the turn order. Notify gm of round end.
   // Turn order cannot advance until round begins
   // turnOrder is the current participant array before cycling for the turn
+  // Modifies turnOrder
   // Modifies combat
   // combat is from currentCombat()
   var advanceTurnAndNotifyOfRoundEnd = function( turnOrder, combat )
@@ -840,11 +885,11 @@ var tbdCombat = tbdCombat || ( function()
       // Purge turn order after cycling.
       // This avoids issue where turnOrder[ 0 ] could be purged and then cycling would effectively skip the following participant
       turnOrder = purgeTurnOrder( turnOrder );
-      storeTurnOrder( turnOrder );
       if ( roundComplete( turnOrder ) ) {
         endRound( combat );
         showCombatMenu( combat, turnOrder );
       } else {
+        progressConcentration( turnOrder[ 0 ] );
         progressConditionRecord( turnOrder[ 0 ], combat.records, WhenToAdvanceCondition.BEFORE_TURN );
         showCombatMenu( combat, turnOrder );
         announceTurn( turnOrder[ 0 ] );
@@ -852,7 +897,6 @@ var tbdCombat = tbdCombat || ( function()
       }
     } else {
       // Store turn order here for case where turn was advanced via initative page and needs to be reset
-      storeTurnOrder( turnOrder );
       sendChat( Roll20.ANNOUNCER, '/w gm Round has not started.' );
     }
   };
@@ -865,6 +909,7 @@ var tbdCombat = tbdCombat || ( function()
         function( participant )
         {
           if ( ! participant.tookTurn ) {
+            progressConcentration( participant );
             progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.BEFORE_TURN );
             progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.AFTER_TURN );
             participant.tookTurn = true;
@@ -876,6 +921,7 @@ var tbdCombat = tbdCombat || ( function()
       turnOrder.forEach(
         function( participant )
         {
+          progressConcentration( participant );
           progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.BEFORE_TURN );
           progressConditionRecord( participant, combat.records, WhenToAdvanceCondition.AFTER_TURN );
           participant.tookTurn = true;
@@ -930,9 +976,11 @@ var tbdCombat = tbdCombat || ( function()
             }
           } else if ( subcommand == 'round' ) {
             startRound( turnOrder, combat );
+            storeTurnOrder( turnOrder );
             storeCombat( combat );
           } else if ( subcommand == 'advance' ) {
             advanceTurnAndNotifyOfRoundEnd( turnOrder, combat );
+            storeTurnOrder( turnOrder );
             storeCombat( combat );
           } else if ( subcommand == 'clear' ) {
             clearAll();
@@ -962,6 +1010,7 @@ var tbdCombat = tbdCombat || ( function()
           } else if ( subcommand == 'skipround' ) {
             skipCombatRound( turnOrder, combat );
             storeCombat( combat );
+            storeTurnOrder( turnOrder );
             showCombatMenu( combat, turnOrder );
           } else if ( subcommand == 'listmarkers' ) {
             showTokenMarkers( message.playerid );

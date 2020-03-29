@@ -41,12 +41,16 @@ var Concentration = Concentration || (function() {
   markers = ['blue', 'brown', 'green', 'pink', 'purple', 'red', 'yellow', '-', 'all-for-one', 'angel-outfit', 'archery-target', 'arrowed', 'aura', 'back-pain', 'black-flag', 'bleeding-eye', 'bolt-shield', 'broken-heart', 'broken-shield', 'broken-skull', 'chained-heart', 'chemical-bolt', 'cobweb', 'dead', 'death-zone', 'drink-me', 'edge-crack', 'fishing-net', 'fist', 'fluffy-wing', 'flying-flag', 'frozen-orb', 'grab', 'grenade', 'half-haze', 'half-heart', 'interdiction', 'lightning-helix', 'ninja-mask', 'overdrive', 'padlock', 'pummeled', 'radioactive', 'rolling-tomb', 'screaming', 'sentry-gun', 'skull', 'sleepy', 'snail', 'spanner',   'stopwatch','strong', 'three-leaves', 'tread', 'trophy', 'white-tower'],
 
   handleInput = (msg) => {
-      if(state[state_name].config.auto_add_concentration_marker && 
-          msg && msg.rolltemplate && 
-          ((msg.rolltemplate === 'spell' && msg.content.includes("{{concentration=1}}")) || 
-          (msg.rolltemplate === '5e-shaped' && msg.content.includes("{{duration=^{CONCENTRATION")) || 
-          ((msg.rolltemplate === 'dmg' || msg.rolltemplate === 'atk') && msg.content.includes('!concentration')))){
-          handleConcentrationSpellCast(msg);
+      if ( state[ state_name ].config.auto_add_concentration_marker && msg && msg.rolltemplate 
+        && ( ( msg.rolltemplate === 'spell' && msg.content.includes( "{{concentration=1}}" ) ) 
+          || ( msg.rolltemplate === '5e-shaped' && msg.content.includes( "{{duration=^{CONCENTRATION" ) ) 
+          || ( (msg.rolltemplate === 'dmg' || msg.rolltemplate === 'atk' ) && msg.content.includes('!concentration') ) )
+      ) {
+        // Initial testing shows that the first of the "or" sub-branches is taken
+        // rolltemplate is spell and the text includes {{concentration=1}}
+        // Bless contains the text: {{duration=Up to 1 minute}}
+        // Banishment duration matches bless
+        handleConcentrationSpellCast( msg );
       }
 
       if (msg.type != 'api') return;
@@ -175,6 +179,29 @@ var Concentration = Concentration || (function() {
       }
   },
 
+  // Convert string input to a time in rounds
+  extractDuration = function( rawDuration )
+  {
+    const match = rawDuration.match( /\s*([0-9]+\.?[0-9]*)\s*([a-zA-z]+)/ );
+    if ( match != null && match.length == 3 ) {
+      const value = Number( match[ 1 ] );
+      const units = match[ 2 ].toLowerCase();
+      if ( [ 'turn', 'turns' ].includes( units ) ) {
+        return value;
+      } else if ( [ 'm', 'min', 'minute', 'minutes' ].includes( units ) ) {
+        return 10 * value;
+      } else if ( [ 'h', 'hr', 'hour', 'hours' ].includes( units ) ) {
+        return 10 * 60 * value;
+      } else if ( [ 'd', 'day', 'days' ].includes( units ) ) {
+        return 10 * 60 * 24 * value;
+      } else {
+        return -1;
+      }
+    } else {
+      return -1;
+    }
+  },
+  
   handleConcentrationSpellCast = (msg) => {
       const marker = state[state_name].config.statusmarker
 
@@ -206,7 +233,15 @@ var Concentration = Concentration || (function() {
           message += '<b>'+character_name+'</b> is now concentrating on <b>'+spell_name+'</b>.';
 
           if ( tbdCombat !== undefined && tbdCombat.assignConcentration ) {
-            tbdCombat.assignConcentration( token.get('_id'), spell_name );
+            const rawDuration = msg.content.match( /{{duration=(.*?)}}/ );
+            var duration = 10;
+            if ( rawDuration.length == 2 ) {
+              const candidateDuration = extractDuration( rawDuration[ 1 ] );
+              if ( candidateDuration > 0 ) {
+                duration = candidateDuration;
+              }
+            }
+            tbdCombat.assignConcentration( token.get('_id'), spell_name, duration );
           }
 
       });
@@ -220,12 +255,18 @@ var Concentration = Concentration || (function() {
       makeAndSendMenu(message, '', target);
   },
 
-  handleStatusMarkerChange = (obj, prev) => {
-      const marker = state[state_name].config.statusmarker
-      
-      if(!obj.get('status_'+marker)){
-          removeMarker(obj.get('represents'));
-      }
+  // newObject is a roll20 api object with special getter methods
+  // oldObject is a plain javascript object
+  handleStatusMarkerChange = function( newObject, oldObject )
+  {
+    const concentrationMarker = state[ state_name ].config.statusmarker;
+    const wasConcentrating = oldObject.statusmarkers.split( ',' ).includes( concentrationMarker );
+    const nowConcentrating = newObject.get( 'status_' + concentrationMarker );
+//    log( 'Concentrating: ' + wasConcentrating );
+//    log( newObject.get( 'status_' + concentrationMarker ) );
+    if( wasConcentrating && ! nowConcentrating ) {
+      removeMarker( newObject.get( 'represents' ) );
+    }
   },
 
   addNetModifierInput = ( defaultModifier ) => {
