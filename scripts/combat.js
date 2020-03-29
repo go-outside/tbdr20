@@ -984,6 +984,7 @@ var tbdCombat = tbdCombat || ( function()
             storeCombat( combat );
           } else if ( subcommand == 'clear' ) {
             clearAll();
+            turnOrder = currentTurnOrder();
             showInitiativePage( false );
             // combat is invalid after calling clearAll. Re-fetch currentCombat to show menu
             showCombatMenu( currentCombat(), turnOrder );
