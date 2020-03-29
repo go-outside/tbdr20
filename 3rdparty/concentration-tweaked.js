@@ -153,30 +153,34 @@ var Concentration = Concentration || (function() {
   },
 
   addConcentration = (token, playerid, spell) => {
-      const marker = state[state_name].config.statusmarker
-      let character = getObj('character', token.get('represents'));
-      if((token.get('controlledby').split(',').includes(playerid) || token.get('controlledby').split(',').includes('all')) ||
-          (character && (character.get('controlledby').split(',').includes(playerid) || character.get('controlledby').split(',').includes('all'))) ||
-          playerIsGM(playerid)){
-              if(!token.get('status_'+marker)){
-                  let target = state[state_name].config.send_reminder_to;
-                  if(target === 'character'){
-                      target = createWhisperName(character_name);
-                  }else if(target === 'everyone'){
-                      target = ''
-                  }
+    const marker = state[state_name].config.statusmarker;
+    let character = getObj('character', token.get('represents'));
+    if ( ( token.get( 'controlledby' ).split( ',' ).includes( playerid ) || token.get( 'controlledby' ).split( ',' ).includes( 'all' ) )
+      || ( character && ( character.get( 'controlledby' ).split( ',' ).includes( playerid ) 
+        || character.get( 'controlledby' ).split( ',' ).includes( 'all' ) ) ) 
+      || playerIsGM( playerid )
+    ) {
+      if ( ! token.get('status_'+marker) ) {
+        let target = state[state_name].config.send_reminder_to;
+        if(target === 'character') {
+          target = createWhisperName(character_name);
+        } else if(target === 'everyone') {
+          target = ''
+        }
 
-                  let message;
-                  if(spell){
-                      message = '<b>'+token.get('name')+'</b> is now concentrating on <b>'+spell+'</b>.';
-                  }else{
-                      message = '<b>'+token.get('name')+'</b> is now concentrating.';
-                  }
+        let message;
+        if ( spell ) {
+            message = '<b>'+token.get('name')+'</b> is now concentrating on <b>'+spell+'</b>.';
+        } else {
+            message = '<b>'+token.get('name')+'</b> is now concentrating.';
+        }
 
-                  makeAndSendMenu(message, '', target);
-              }
-              token.set('status_'+marker, !token.get('status_'+marker));
+        makeAndSendMenu( message, '', target );
+        token.set( 'status_' + marker, true );
+      } else {
+        removeMarker( token.get( 'represents' ) );
       }
+    }
   },
 
   // Convert string input to a time in rounds
