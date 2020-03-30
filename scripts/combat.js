@@ -265,8 +265,8 @@ var tbdCombat = tbdCombat || ( function()
   };
   
   // Takes a graphicId used to pair to an existing participant
-  // Takes a string or undefined for spell.
-  // Takes a duration or undefined for a number of turns
+  // Takes a string for spell or undefined.
+  // Takes a duration for a number of turns or undefined
   // If spell is a strign with length > 1, then concentration is assigned. Otherwise concentration is set undefined
   var assignParticipantConcentration = function( graphicId, spell, duration )
   {
