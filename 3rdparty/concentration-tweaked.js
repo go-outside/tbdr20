@@ -154,6 +154,7 @@ var Concentration = Concentration || (function() {
 
   addConcentration = (token, playerid, spell) => {
     const marker = state[state_name].config.statusmarker;
+    const graphicId = token.get( '_id' );
     let character = getObj('character', token.get('represents'));
     if ( ( token.get( 'controlledby' ).split( ',' ).includes( playerid ) || token.get( 'controlledby' ).split( ',' ).includes( 'all' ) )
       || ( character && ( character.get( 'controlledby' ).split( ',' ).includes( playerid ) 
@@ -177,8 +178,14 @@ var Concentration = Concentration || (function() {
 
         makeAndSendMenu( message, '', target );
         token.set( 'status_' + marker, true );
+        if ( tbdCombat !== undefined && tbdCombat.assignConcentration ) {
+          const duration = 10;
+          const combatSpellName = spell === undefined ? 'Unspecified Action' : spell;
+          tbdCombat.assignConcentration( graphicId, combatSpellName, duration );
+        }
+
       } else {
-        removeMarker( token.get( 'represents' ) );
+        removeMarker( graphicId );
       }
     }
   },
@@ -269,7 +276,7 @@ var Concentration = Concentration || (function() {
 //    log( 'Concentrating: ' + wasConcentrating );
 //    log( newObject.get( 'status_' + concentrationMarker ) );
     if( wasConcentrating && ! nowConcentrating ) {
-      removeMarker( newObject.get( 'represents' ) );
+      removeMarker( newObject.get( '_id' ) );
     }
   },
 
@@ -279,6 +286,8 @@ var Concentration = Concentration || (function() {
 
   handleGraphicChange = (obj, prev) => {
       if(checked.includes(obj.get('represents'))){ return false; }
+
+      const rollId = obj.get( '_id' );
 
       let bar = 'bar'+state[state_name].config.bar+'_value',
           target = state[state_name].config.send_reminder_to, 
@@ -303,17 +312,17 @@ var Concentration = Concentration || (function() {
 
           if ( state[state_name].config.show_roll_button ) {
               chat_text += '<hr><div>' 
-                + makeButton( 'Disadvantage', '!' + state[state_name].config.command + ' ' + kDisadvantage + ' ' + obj.get('represents') 
+                + makeButton( 'Disadvantage', '!' + state[state_name].config.command + ' ' + kDisadvantage + ' ' + rollId 
                   + ' ' + DC + ' ' + addNetModifierInput( con_save_mod ) + ' ' + obj.get('name') + ' ' + target, styles.button + styles.float.right )
-                + '&nbsp;' + makeButton( 'Advantage', '!' + state[state_name].config.command + ' ' + kAdvantage + ' ' + obj.get('represents') + ' ' 
+                + '&nbsp;' + makeButton( 'Advantage', '!' + state[state_name].config.command + ' ' + kAdvantage + ' ' + rollId + ' ' 
                   + DC + ' ' + addNetModifierInput( con_save_mod ) + ' ' + obj.get('name') + ' ' + target, styles.button + styles.float.right )
-                + '&nbsp;' + makeButton( 'Roll', '!' + state[state_name].config.command + ' roll ' + obj.get('represents') + ' ' 
+                + '&nbsp;' + makeButton( 'Roll', '!' + state[state_name].config.command + ' roll ' + rollId + ' ' 
                   + DC + ' ' + addNetModifierInput( con_save_mod ) + ' ' + obj.get('name') + ' ' + target, styles.button + styles.float.left );
           }
 
           if(state[state_name].config.auto_roll_save){
               //&{template:default} {{name='+obj.get('name')+' - Concentration Save}} {{Modifier='+con_save_mod+'}} {{Roll=[[1d20cf<'+(DC-con_save_mod-1)+'cs>'+(DC-con_save_mod-1)+'+'+con_save_mod+']]}} {{DC='+DC+'}}
-              roll(obj.get('represents'), DC, con_save_mod, obj.get('name'), target, state[state_name].advantages[obj.get('represents')]);
+              roll(rollId, DC, con_save_mod, obj.get('name'), target, state[state_name].advantages[obj.get('represents')]);
           }else{
               makeAndSendMenu(chat_text, '', target);
           }
@@ -333,7 +342,7 @@ var Concentration = Concentration || (function() {
     }
   },
 
-  roll = (represents, DC, net_modifier, name, target, advantage) => {
+  roll = ( graphicId, DC, net_modifier, name, target, advantage) => {
       sendChat(script_name, '[[1d20cf<'+(DC-net_modifier-1)+'cs>'+(DC-net_modifier-1)+'+'+net_modifier+']]', results => {
           let title = 'Concentration Save <br> <b style="font-size: 10pt; color: gray;">'+name+'</b>',
               advantageRollResult;
@@ -389,21 +398,23 @@ var Concentration = Concentration || (function() {
           }
 
           if(!success){
-              removeMarker(represents);
+              removeMarker( graphicId );
           }
       });
   },
-
-  removeMarker = (represents, type='graphic') => {
-      findObjs({ type, represents }).forEach( tokenObject => {
-        tokenObject.set('status_'+state[state_name].config.statusmarker, false);
-
+  // Set concentration status marker to false
+  // Notify !combat of concentration end
+  removeMarker = function( graphicId )
+  {
+    findObjs( { _type: 'graphic', _id: graphicId } ).forEach( 
+      function( tokenObject )
+      {
+        tokenObject.set( 'status_' + state[ state_name ].config.statusmarker, false );
         if ( tbdCombat !== undefined && tbdCombat.assignConcentration ) {
           // Clear the concentration assignment in combat
           tbdCombat.assignConcentration( tokenObject.get('_id') );
         }
-
-      });
+      } );
   },
 
   createWhisperName = (name) => {
