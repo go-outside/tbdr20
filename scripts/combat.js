@@ -112,7 +112,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Mirror', ' has multiple images.', ' no longer has multiple images.', 'two-shadows' ) );
   conditions.push( createCondition( 'Blink', ' is blinks out of existance.', ' has returned.', 'teleport' ) );
   conditions.push( createCondition( 'Blur', ' image is blurred.', ' image is no longer blurred.', 'relationship-bounds' ) );
-  conditions.push( createCondition( 'Weakness', ' is saped of strength.', ' has thier strength return.', 'slavery-whip' ) );
+  conditions.push( createCondition( 'Weakness', ' is saped of strength.', ' has their strength return.', 'slavery-whip' ) );
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'fire' ) );
   conditions.push( createCondition( 'True-seeing', ' has true sight.', ' no longer has true sight.', 'eye-of-horus' ) );
   conditions.push( createCondition( 'Bless', ' is blessed.', ' is no longer blessed.', 'angel-outfit' ) );
