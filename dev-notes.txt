@@ -1,7 +1,9 @@
 
 
+Round x Turns
 
-
+Modify movers for case where a token has multiple controllers -- pick first in controller list rather than preventing move handoff
+Attempt to show move circle only to the controllers of the token
 
 elevation / flight / dynamic lighting
 See One-Way Dynamic Lighting

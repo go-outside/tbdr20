@@ -406,7 +406,7 @@ var Concentration = Concentration || (function() {
   // Notify !combat of concentration end
   removeMarker = function( graphicId )
   {
-    findObjs( { _type: 'graphic', _id: graphicId } ).forEach( 
+    findObjs( { _pageid: Campaign().get( 'playerpageid' ), _type: 'graphic', _id: graphicId } ).forEach( 
       function( tokenObject )
       {
         tokenObject.set( 'status_' + state[ state_name ].config.statusmarker, false );
