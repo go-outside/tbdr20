@@ -1,10 +1,7 @@
 
-!concentration on its own does entered does not cancel - still
 
 
-concentration causes out of combat spam -- maybe if !concentration is in chat
-peel duration: concentration and length of time from spells cast
-track concentration duration
+
 
 elevation / flight / dynamic lighting
 See One-Way Dynamic Lighting

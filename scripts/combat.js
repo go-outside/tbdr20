@@ -264,6 +264,22 @@ var tbdCombat = tbdCombat || ( function()
     return { id: graphicId, pr: initiative, tookTurn: false, concentration: undefined, duration: undefined };
   };
   
+  // Return character name if all objects defined
+  // Return undefined otherwise
+  var nameFromGraphicId = function( graphicId )
+  {
+    const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
+    // Check to see that roll object is still defined -- it may have been removed
+    if ( graphic !== undefined ) {
+      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
+      if ( maybeCharacter !== undefined ) {
+        return maybeCharacter.get( Roll20.Objects.NAME );
+      }
+    }
+    return undefined;
+  };
+
+  // If turnOrder is empty, do nothing
   // Takes a graphicId used to pair to an existing participant
   // Takes a string for spell or undefined.
   // Takes a duration for a number of turns or undefined
@@ -271,19 +287,25 @@ var tbdCombat = tbdCombat || ( function()
   var assignParticipantConcentration = function( graphicId, spell, duration )
   {
     var turnOrder = currentTurnOrder();
-    const participant = turnOrder.find( participant => participant.id == graphicId );
-    if ( participant === undefined ) {
-      sendChat( Roll20.ANNOUNCER, '/w gm Participant is not in combat. Cannot track concentration.' );
-    } else {
-      if ( spell === undefined || spell.length === undefined || spell.length < 1 ) {
-        participant.concentration = undefined;
-        participant.duration = undefined;
+    if ( turnOrder.length > 0 ) {
+      const participant = turnOrder.find( participant => participant.id == graphicId );
+      if ( participant === undefined ) {
+        var name = nameFromGraphicId( graphicId );
+        if ( name === undefined ) {
+          name = 'Non-character based participant';
+        }
+        sendChat( Roll20.ANNOUNCER, '/w gm ' + name + ' is not in combat. Cannot track concentration.' );
       } else {
-        participant.concentration = spell;
-        participant.duration = duration;
+        if ( spell === undefined || spell.length === undefined || spell.length < 1 ) {
+          participant.concentration = undefined;
+          participant.duration = undefined;
+        } else {
+          participant.concentration = spell;
+          participant.duration = duration;
+        }
       }
+      storeTurnOrder( turnOrder );
     }
-    storeTurnOrder( turnOrder );
   };
 
   // Global state serialization
@@ -443,7 +465,7 @@ var tbdCombat = tbdCombat || ( function()
 
   // Check to see if the round has started
   // If round has started and originalCurrent turn is different than turnOrder[ 0 ], announce that turn order has changed
-  // Does not modify combat
+  // Does not modify combat. Does not modify turnOrder
   // combat is from currentCombat()
   var maybeReannounceTurn = function( originalCurrentTurnParticipant, turnOrder, combat )
   {
