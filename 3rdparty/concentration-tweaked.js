@@ -222,7 +222,7 @@ var Concentration = Concentration || (function() {
       spell_name = RegExp.$1;
       let player = getObj('player', msg.playerid),
           characterid = findObjs({ name: character_name, _type: 'character' }).shift().get('id'),                 
-          represented_tokens = findObjs({ represents: characterid, _type: 'graphic' }),
+          represented_tokens = findObjs({ _pageid: Campaign().get( 'playerpageid' ), represents: characterid, _type: 'graphic' }),
           message,
           target = state[state_name].config.send_reminder_to;
 
