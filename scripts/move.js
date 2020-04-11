@@ -33,6 +33,7 @@ var tbdMove = tbdMove || ( function()
     API : 'api'
   };
   Roll20.Objects = {
+    _ID : '_id',
     ALL : 'all',
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
@@ -225,10 +226,13 @@ var tbdMove = tbdMove || ( function()
       if ( mover !== undefined ) {
         const graphic = getObj( Roll20.Objects.GRAPHIC, mover.graphicId );
         if ( graphic !== undefined ) {
+          const originalCircleCount = mover.circles.length;
           addMovementCircle( graphic, mover );
-          updateMoverGraphics( graphic, mover );
-          showMoveMenu( mover.playerId, movers );
-          storeMovers( movers );
+          if ( mover.circles.length != originalCircleCount ) {
+            updateMoverGraphics( graphic, mover );
+            showMoveMenu( mover.playerId, movers );
+            storeMovers( movers );
+          }
         }
       }
     }
@@ -443,9 +447,9 @@ var tbdMove = tbdMove || ( function()
     }
   };
 
-  // If graphic has moved or is initially places, add a graphic to the page for the current movement circle
+  // If graphic has moved or is initially placed, add a graphic to the page for the current movement circle
   // Add the graphic id and circle to mover
-  // Modifies mover
+  // Modifies mover.circles by adding a circle on start of move or after a token position change
   var addMovementCircle = function( graphic, mover )
   {
     const newCircle = circleOnMapAtGraphic( graphic, 0 );
@@ -527,44 +531,53 @@ var tbdMove = tbdMove || ( function()
     }
   };
 
+  /// Return the character object represented by the token
+  /// Takes a graphic id
+  /// Return undefined if no character is represented
+  var representedCharacterId = function( graphicId )
+  {
+    const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
+    return graphic !== undefined
+      ? graphic.get( Roll20.Verbs.REPRESENTS )
+      : undefined;
+  };
+
   // Create a new mover if graphic and player are a valid combination
   // Remove any mover from originalMovers controlled by that player
   // Return the new list of movers
-  var maybeCreateMover = function( playerId, graphicId, originalMovers )
+  var maybeCreateMover = function( playerId, graphicId, characterId, originalMovers )
   {
     // Purge any other mover from the movers list that are controlled by playerId
     const newMovers = removePlayer( playerId, originalMovers );
     // Now make the new mover if possible
     const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
-    if ( graphic !== undefined ) {
-      const maybeCharacter = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
-      if ( maybeCharacter !== undefined ) {
-        const controllers = maybeCharacter.get( Roll20.Objects.CONTROLLEDBY ).split( ',' ).filter( item => item.length > 0 );
-        if ( playerIsGM( playerId ) 
-          || controllers == Roll20.Objects.ALL 
-          || controllers.find( controller => controller == playerId )
-        ) {
-          const player = getObj( Roll20.Objects.PLAYER, playerId );
-          var color = player === undefined ? Roll20.Colors.BLACK : player.get( Roll20.Objects.COLOR );
-          // -- begin WTF
-          // For whatever reason, Roll20 html color strings from player.get() may have less than 6 number characters following the #
-          // Path graphics do not support stroke attribute with these truncated values
-          // Backfill with 0's
-          while ( color.length < 7 ) {
-            color = color + '0';
-          }
-          // -- end WTF
-          const mover = createMover( 
-            graphicId, 
-            maybeCharacter.id, 
-            playerId, 
-            // Render graphics on the GM layer for tokens with no controllers
-            controllers.length == 0 ? Roll20.Objects.GMLAYER : Roll20.Objects.OBJECTS, 
-            color );
-          addMovementCircle( graphic, mover );
-          updateMoverGraphics( graphic, mover );
-          newMovers.push( mover );
+    const character = getObj( Roll20.Objects.CHARACTER, characterId );
+    if ( graphic !== undefined && character !== undefined ) {
+      const controllers = character.get( Roll20.Objects.CONTROLLEDBY ).split( ',' ).filter( item => item.length > 0 );
+      if ( playerIsGM( playerId ) 
+        || controllers == Roll20.Objects.ALL 
+        || controllers.find( controller => controller == playerId )
+      ) {
+        const player = getObj( Roll20.Objects.PLAYER, playerId );
+        var color = player === undefined ? Roll20.Colors.BLACK : player.get( Roll20.Objects.COLOR );
+        // -- begin WTF
+        // For whatever reason, Roll20 html color strings from player.get() may have less than 6 number characters following the #
+        // Path graphics do not support stroke attribute with these truncated values
+        // Backfill with 0's
+        while ( color.length < 7 ) {
+          color = color + '0';
         }
+        // -- end WTF
+        const mover = createMover( 
+          graphicId, 
+          characterId, 
+          playerId, 
+          // Render graphics on the GM layer for tokens with no controllers
+          controllers.length == 0 ? Roll20.Objects.GMLAYER : Roll20.Objects.OBJECTS, 
+          color );
+        addMovementCircle( graphic, mover );
+        updateMoverGraphics( graphic, mover );
+        newMovers.push( mover );
       }
     }
     return newMovers;
@@ -585,12 +598,13 @@ var tbdMove = tbdMove || ( function()
     }
   };
 
-  /// Create a mover for the playerId / graphicId pair
+  /// Create a mover for the playerId / graphicId / characterId triplet
+  /// characterId provided to allow for surrogate graphic that does not directly reference a character
   /// Present the move menu to that player
   /// Maybe be called externally
-  var startMoveForPlayer = function( playerId, graphicId )
+  var startMoveForPlayer = function( playerId, graphicId, characterId )
   {
-    const movers = maybeCreateMover( playerId, graphicId, currentMovers() );
+    const movers = maybeCreateMover( playerId, graphicId, characterId, currentMovers() );
     showMoveMenu( playerId, movers );
     storeMovers( movers );
   };
@@ -622,7 +636,10 @@ var tbdMove = tbdMove || ( function()
             }
           } else if ( subcommand == 'start' ) {
             if ( message.selected !== undefined && message.selected.length == 1 ) {
-              startMoveForPlayer( message.playerid, message.selected[ 0 ]._id );
+              startMoveForPlayer( 
+                message.playerid, 
+                message.selected[ 0 ]._id, 
+                representedCharacterId( message.selected[ 0 ]._id ) );
             }
           } else if ( subcommand == 'terrain' ) {
             const movers = currentMovers();

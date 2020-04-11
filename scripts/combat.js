@@ -27,6 +27,8 @@ var tbdCombat = tbdCombat || ( function()
   Roll20.Objects = {
     _ID : '_id',
     _ONLINE : '_online',
+    _PAGEID : '_pageid',
+    _TYPE : '_type',
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
     CONTROLLEDBY : 'controlledby',
@@ -37,6 +39,7 @@ var tbdCombat = tbdCombat || ( function()
     MACRO : 'macro',
     NAME : 'name',
     PATH : 'path',
+    PLAYERPAGEID : 'playerpageid',
     PLAYER : 'player',
     STATUS : 'status_',
     STATUS_MARKERS : 'statusmarkers',
@@ -425,6 +428,34 @@ var tbdCombat = tbdCombat || ( function()
     return sendChat( '', '/desc ' + name + condition.recover );
   };
 
+  /// Return the token used for character movement
+  /// Looks for an alternate token, 'i<name>', where '<name>' is the graphic name
+  /// Return id for token i<name> if available otherwise return id for token with <name>
+  var movementToken = function( graphicId )
+  {
+    const pageId = Campaign().get( Roll20.Objects.PLAYERPAGEID );
+    const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
+    if ( graphic !== undefined ) {
+      const alternateLowerCaseName = 'i' + graphic.get( Roll20.Objects.NAME ).toLowerCase();
+      const matchingAlternateTokens = filterObjs(
+        function( object )
+        {
+          const objectName = object.get( Roll20.Objects.NAME );
+          return objectName !== undefined
+            && objectName.toLowerCase() == alternateLowerCaseName
+            && object.get( Roll20.Objects._PAGEID ) == pageId
+            && object.get( Roll20.Objects._TYPE ) == Roll20.Objects.GRAPHIC;
+        } );
+      if ( matchingAlternateTokens.length == 1 ) {
+        return matchingAlternateTokens[ 0 ].get( Roll20.Objects._ID );
+      } else if ( matchingAlternateTokens.length > 1 ) {
+        sendChat( Roll20.ANNOUNCER, '/w gm Found ' + matchingAlternateTokens.length 
+          + ' matching alternate tokens for \'' + alternateLowerCaseName + '\'. Providing default token for !move.' );
+      }
+    }
+    return graphicId;
+  }
+
   // Notify chat of participant turn
   // If !move is installed, clear all movers and then initialize !move for the token with turn
   var announceTurn = function( participant )
@@ -437,24 +468,31 @@ var tbdCombat = tbdCombat || ( function()
       } else {
         sendChat( '', '/desc ' + tokenName + ' has the initiative.' );
       }
+      const character = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
       // Trigger move menu and initialization if that module is installed
-      if ( tbdMove !== undefined && tbdMove.clearAll !== undefined && tbdMove.startMoveForPlayer !== undefined ) {
+      if ( tbdMove !== undefined 
+        && tbdMove.clearAll !== undefined 
+        && tbdMove.startMoveForPlayer !== undefined 
+        && character !== undefined
+      ) {
         tbdMove.clearAll();
         const controllers = participantControllers( participant );
         if ( controllers.length == 0 ) {
           const gmId = findFirstOnlineGmPlayerId();
           if ( gmId !== undefined ) {
-            tbdMove.startMoveForPlayer( gmId, participant.id );
+            tbdMove.startMoveForPlayer( gmId, movementToken( participant.id ), character.get( Roll20.Objects._ID ) );
           }
-        } else if ( controllers.length == 1 ) {
+        } else if ( controllers.length > 0 ) {
           const playerId = controllers[ 0 ];
           const player = getObj( Roll20.Objects.PLAYER, playerId );
           if ( player !== undefined && player.get( Roll20.Objects._ONLINE ) ) {
-            tbdMove.startMoveForPlayer( playerId, participant.id );
+            tbdMove.startMoveForPlayer( playerId, movementToken( participant.id ), character.get( Roll20.Objects._ID ) );
           } else {
             sendChat( Roll20.ANNOUNCER, '/w gm Player is not online to control movement' );
           }
         } else {
+          // This branch is no longer accessible.
+          // It was used for case where controllers.length > 1
           sendChat( Roll20.ANNOUNCER, '/w gm Cannot hand off !move control of \'' + tokenName + '\' because it has multiple controllers' );
         }
       } else {
