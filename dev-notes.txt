@@ -1,16 +1,8 @@
 
+disable sight on npc tokens
+make as few dynamic lighting lines as possible
+https://app.roll20.net/forum/post/1532262/questions-and-tips-for-api-script-performance/?pageforid=1532382#post-1532382
 
-Move menu is being sent twice on drag movement.
-Sent once on undo -- might be event capture of top and left changing
-
-
-On name's turn, look for a token called iname. 
-If an iname token exists pass move to that token referencing name's character sheet
-If no iname token exists continue as before
-
-Modify movers for case where a token has multiple controllers -- pick first in controller list rather than preventing move handoff
-Attempt to show move circle only to the controllers of the token
-Verify from Bill: Is the hidden token on the GM layer but controlled by the player? That doesn't seem right
 
 elevation / flight / dynamic lighting
 See One-Way Dynamic Lighting

@@ -225,6 +225,48 @@ var tbdCombat = tbdCombat || ( function()
     state.tbdCombat = combatCopy;
   };
   
+  var storePerformance = function( performance )
+  {
+    const performanceCopy = {};
+    copyPerformance( performance, performanceCopy );
+    state.tbdCombatPerformance = performanceCopy;
+  };
+
+  var copyPerformance = function( source, destination )
+  {
+    destination.chatMessages = source.chatMessages;
+    destination.combatCalls = source.combatCalls;
+    destination.eventsHandled = source.eventsHandled;
+    destination.totalMilliseconds = source.totalMilliseconds;
+    destination.maximumResolutionMilliseconds = source.maximumResolutionMilliseconds;
+  };
+
+  var clearPerformance = function()
+  {
+    state.tbdCombatPerformance = undefined;
+  };
+
+  var currentPerformance = function()
+  {
+    if ( state.tbdCombatPerformance === undefined ) {
+      return {
+        // Count the number of times handleChatMessage is called
+        chatMessages: 0,
+        // Count the number of times handleChatMessage is called with !combat
+        combatCalls: 0,
+        // Count the number of times !combat responding to a non-handleChatMessage event
+        eventsHandled: 0,
+        // Count the total number of milliseconds spent handling script actions
+        totalMilliseconds: 0,
+        // Track the maximum time spent resolving a single action
+        maximumResolutionMilliseconds: 0 };
+    } else {
+      const performance = {};
+      copyPerformance( state.tbdCombatPerformance, performance );
+      return performance;
+    }
+  };
+
   // Copy source into destination and return destination
   // source and destination are standard r20 turn order entries
   var copyParticipant = function( source, destination )
@@ -456,6 +498,8 @@ var tbdCombat = tbdCombat || ( function()
     return graphicId;
   }
 
+  const kEnableAlternateTokens = false;
+
   // Notify chat of participant turn
   // If !move is installed, clear all movers and then initialize !move for the token with turn
   var announceTurn = function( participant )
@@ -480,13 +524,23 @@ var tbdCombat = tbdCombat || ( function()
         if ( controllers.length == 0 ) {
           const gmId = findFirstOnlineGmPlayerId();
           if ( gmId !== undefined ) {
-            tbdMove.startMoveForPlayer( gmId, movementToken( participant.id ), character.get( Roll20.Objects._ID ) );
+            tbdMove.startMoveForPlayer( 
+              gmId, 
+              kEnableAlternateTokens
+                ? movementToken( participant.id )
+                : participant.id, 
+              character.get( Roll20.Objects._ID ) );
           }
         } else if ( controllers.length > 0 ) {
           const playerId = controllers[ 0 ];
           const player = getObj( Roll20.Objects.PLAYER, playerId );
           if ( player !== undefined && player.get( Roll20.Objects._ONLINE ) ) {
-            tbdMove.startMoveForPlayer( playerId, movementToken( participant.id ), character.get( Roll20.Objects._ID ) );
+            tbdMove.startMoveForPlayer( 
+              playerId, 
+              kEnableAlternateTokens
+                ? movementToken( participant.id )
+                : participant.id, 
+              character.get( Roll20.Objects._ID ) );
           } else {
             sendChat( Roll20.ANNOUNCER, '/w gm Player is not online to control movement' );
           }
@@ -860,6 +914,7 @@ var tbdCombat = tbdCombat || ( function()
           + conditionDurations
           + concentrationEntry
           + makeDiv( arrowStyle, '' )
+          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat performance">Performance</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
     } else {
@@ -878,6 +933,7 @@ var tbdCombat = tbdCombat || ( function()
           + conditionDurations
           + concentrationEntry
           + makeDiv( arrowStyle, '' )
+          + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat performance">Performance</a>' )
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
     }
@@ -921,6 +977,9 @@ var tbdCombat = tbdCombat || ( function()
     sendChat( Roll20.ANNOUNCER, '/w gm Round ' + combat.round + ' is complete.' );
     // Set the turn to zero to indicate round is complete
     combat.turn = 0;
+    if ( tbdMove !== undefined && tbdMove.clearAll !== undefined ) {
+      tbdMove.clearAll();
+    }
   };
 
   // Advance the turn order. Notify gm of round end.
@@ -1007,12 +1066,13 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Delegate resolution of chat event
-  var handleChatMessage = function( message )
+  var handleChatMessage = function( message, performance )
   {
     if ( message.type === 'api' ) {
       const tokens = message.content.split( ' ' );
       const command = tokens[ 0 ];
       if ( command === '!combat' && playerIsGM( message.playerid ) ) {
+        performance.combatCalls++;
         const combat = currentCombat();
         var turnOrder = currentTurnOrder();
         if ( tokens.length == 1 ) {
@@ -1057,6 +1117,11 @@ var tbdCombat = tbdCombat || ( function()
               storeCombat( combat );
               showCombatMenu( combat, turnOrder );
             }
+          } else if ( subcommand == 'performance' ) {
+            const p = currentPerformance();
+            const average = p.totalMilliseconds / ( p.combatCalls + p.eventsHandled );
+            sendChat( Roll20.ANNOUNCER, '/w gm Average resolution: ' + average.toFixed( 1 )
+              + ' ms, Maximum: ' + p.maximumResolutionMilliseconds.toFixed( 1 ) + ' ms' );
           } else if ( subcommand == 'removecondition' && tokens.length == 3 ) {
             removeConditionRecord( Number( tokens[ 2 ] ), combat );
             storeCombat( combat );
@@ -1164,12 +1229,46 @@ var tbdCombat = tbdCombat || ( function()
   {
     // Ensure the combatTokenMarkers array is filled
     fillTokenMarkers();
-
-    on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
-    on( Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, handleTurnOrderChange );
+    clearPerformance();
+    on( 
+      Roll20.Events.CHAT_MESSAGE, 
+      function( message )
+      {
+        const start = Date.now();
+        const performance = currentPerformance();
+        performance.chatMessages++;
+        const originalCallCount = performance.combatCalls;
+        handleChatMessage( message, performance );
+        if ( performance.combatCalls == originalCallCount + 1 ) {
+          const time = Date.now() - start;
+          performance.totalMilliseconds += time;
+          performance.maximumResolutionMilliseconds = Math.max( performance.maximumResolutionMilliseconds, time );
+        }
+        storePerformance( performance );
+    } );
+    on( 
+      Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, 
+      function( newCampaign, oldCampaign )
+      {
+        const start = Date.now();
+        const performance = currentPerformance();
+        performance.eventsHandled++;
+        handleTurnOrderChange( newCampaign, oldCampaign );
+        const time = Date.now() - start;
+        performance.totalMilliseconds += time;
+        performance.maximumResolutionMilliseconds = Math.max( performance.maximumResolutionMilliseconds, time );
+        storePerformance( performance );
+      } );
 
     log( 'There be dragons! Combat initialized.' );
-	};
+  };
+  
+  var reportPerformance = function( performance )
+  {
+    log( 'Average combat resolution time: ' 
+      + String( performance.totalMilliseconds / ( performance.combatCalls + performance.eventsHandled ) ) + ' ms' );
+    log( performance );
+  };
 
   var runTests = function()
   {
