@@ -1,4 +1,7 @@
 
+
+use alt token only when real token is on gm layer
+
 disable sight on npc tokens
 make as few dynamic lighting lines as possible
 https://app.roll20.net/forum/post/1532262/questions-and-tips-for-api-script-performance/?pageforid=1532382#post-1532382

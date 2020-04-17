@@ -470,6 +470,8 @@ var tbdCombat = tbdCombat || ( function()
     return sendChat( '', '/desc ' + name + condition.recover );
   };
 
+  const kEnableAlternateTokens = true;
+
   /// Return the token used for character movement
   /// Looks for an alternate token, 'i<name>', where '<name>' is the graphic name
   /// Return id for token i<name> if available otherwise return id for token with <name>
@@ -478,27 +480,28 @@ var tbdCombat = tbdCombat || ( function()
     const pageId = Campaign().get( Roll20.Objects.PLAYERPAGEID );
     const graphic = getObj( Roll20.Objects.GRAPHIC, graphicId );
     if ( graphic !== undefined ) {
-      const alternateLowerCaseName = 'i' + graphic.get( Roll20.Objects.NAME ).toLowerCase();
-      const matchingAlternateTokens = filterObjs(
-        function( object )
-        {
-          const objectName = object.get( Roll20.Objects.NAME );
-          return objectName !== undefined
-            && objectName.toLowerCase() == alternateLowerCaseName
-            && object.get( Roll20.Objects._PAGEID ) == pageId
-            && object.get( Roll20.Objects._TYPE ) == Roll20.Objects.GRAPHIC;
-        } );
-      if ( matchingAlternateTokens.length == 1 ) {
-        return matchingAlternateTokens[ 0 ].get( Roll20.Objects._ID );
-      } else if ( matchingAlternateTokens.length > 1 ) {
-        sendChat( Roll20.ANNOUNCER, '/w gm Found ' + matchingAlternateTokens.length 
-          + ' matching alternate tokens for \'' + alternateLowerCaseName + '\'. Providing default token for !move.' );
+      // Search for alternate tokens only if the token is on the gm layer
+      if ( kEnableAlternateTokens && graphic.get( Roll20.Objects.LAYER ) == Roll20.Objects.GM_LAYER ) {
+        const alternateLowerCaseName = 'i' + graphic.get( Roll20.Objects.NAME ).toLowerCase();
+        const matchingAlternateTokens = filterObjs(
+          function( object )
+          {
+            const objectName = object.get( Roll20.Objects.NAME );
+            return objectName !== undefined
+              && objectName.toLowerCase() == alternateLowerCaseName
+              && object.get( Roll20.Objects._PAGEID ) == pageId
+              && object.get( Roll20.Objects._TYPE ) == Roll20.Objects.GRAPHIC;
+          } );
+        if ( matchingAlternateTokens.length == 1 ) {
+          return matchingAlternateTokens[ 0 ].get( Roll20.Objects._ID );
+        } else if ( matchingAlternateTokens.length > 1 ) {
+          sendChat( Roll20.ANNOUNCER, '/w gm Found ' + matchingAlternateTokens.length 
+            + ' matching alternate tokens for \'' + alternateLowerCaseName + '\'. Providing default token for !move.' );
+        }
       }
     }
     return graphicId;
-  }
-
-  const kEnableAlternateTokens = false;
+  };
 
   // Notify chat of participant turn
   // If !move is installed, clear all movers and then initialize !move for the token with turn
@@ -524,23 +527,13 @@ var tbdCombat = tbdCombat || ( function()
         if ( controllers.length == 0 ) {
           const gmId = findFirstOnlineGmPlayerId();
           if ( gmId !== undefined ) {
-            tbdMove.startMoveForPlayer( 
-              gmId, 
-              kEnableAlternateTokens
-                ? movementToken( participant.id )
-                : participant.id, 
-              character.get( Roll20.Objects._ID ) );
+            tbdMove.startMoveForPlayer( gmId, movementToken( participant.id ), character.get( Roll20.Objects._ID ) );
           }
         } else if ( controllers.length > 0 ) {
           const playerId = controllers[ 0 ];
           const player = getObj( Roll20.Objects.PLAYER, playerId );
           if ( player !== undefined && player.get( Roll20.Objects._ONLINE ) ) {
-            tbdMove.startMoveForPlayer( 
-              playerId, 
-              kEnableAlternateTokens
-                ? movementToken( participant.id )
-                : participant.id, 
-              character.get( Roll20.Objects._ID ) );
+            tbdMove.startMoveForPlayer( playerId, movementToken( participant.id ), character.get( Roll20.Objects._ID ) );
           } else {
             sendChat( Roll20.ANNOUNCER, '/w gm Player is not online to control movement' );
           }
