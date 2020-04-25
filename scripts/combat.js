@@ -416,6 +416,9 @@ var tbdCombat = tbdCombat || ( function()
   var clearAll = function()
   {
     storeTurnOrder( [] );
+    // Clean up conditions
+    const combat = currentCombat();
+    combat.records.forEach( purgeConditionRecord );
     state.tbdCombat = undefined;
     if ( tbdMove !== undefined && tbdMove.clearAll !== undefined ) {
       tbdMove.clearAll();

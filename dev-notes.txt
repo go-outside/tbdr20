@@ -1,6 +1,5 @@
 
-
-use alt token only when real token is on gm layer
+combat clear -- remove conditions
 
 disable sight on npc tokens
 make as few dynamic lighting lines as possible
