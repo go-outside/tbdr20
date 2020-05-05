@@ -104,18 +104,21 @@ var tbdCombat = tbdCombat || ( function()
       whenToAdvance: whenToAdvance === undefined ? WhenToAdvanceCondition.AFTER_TURN : whenToAdvance };
   };
 
+  const kReactionCondition = 'Reaction';
+  const kDodgingCondition = 'Dodging';
+
   // Note that two word condition names (first parameter) will require rework for resolution of api command
   var conditions = [];
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'target-arrows' ) );
-  conditions.push( createCondition( 'Reaction', ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );
-  conditions.push( createCondition( 'Dodging', ' starts dodging.', ' is no longer dodging.', 'dodging', WhenToAdvanceCondition.BEFORE_TURN ) );
+  conditions.push( createCondition( kReactionCondition, ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );
+  conditions.push( createCondition( kDodgingCondition, ' starts dodging.', ' is no longer dodging.', 'dodging', WhenToAdvanceCondition.BEFORE_TURN ) );
   conditions.push( createCondition( 'Ready', ' readies an action.', ' is no longer ready.', 'strong', WhenToAdvanceCondition.BEFORE_TURN ) );
   conditions.push( createCondition( 'Haste', ' is fast moving.', ' is back to normal speed.', 'sprint' ) );
   conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'snail' ) );
   conditions.push( createCondition( 'Mirror', ' has multiple images.', ' no longer has multiple images.', 'two-shadows' ) );
   conditions.push( createCondition( 'Blink', ' is blinks out of existance.', ' has returned.', 'teleport' ) );
   conditions.push( createCondition( 'Blur', ' image is blurred.', ' image is no longer blurred.', 'relationship-bounds' ) );
-  conditions.push( createCondition( 'Weakness', ' is saped of strength.', ' has their strength return.', 'slavery-whip' ) );
+  conditions.push( createCondition( 'Weakness', ' is sapped of strength.', ' has their strength return.', 'slavery-whip' ) );
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'fire' ) );
   conditions.push( createCondition( 'True-seeing', ' has true sight.', ' no longer has true sight.', 'eye-of-horus' ) );
   conditions.push( createCondition( 'Bless', ' is blessed.', ' is no longer blessed.', 'angel-outfit' ) );
@@ -234,7 +237,6 @@ var tbdCombat = tbdCombat || ( function()
 
   var copyPerformance = function( source, destination )
   {
-    destination.chatMessages = source.chatMessages;
     destination.combatCalls = source.combatCalls;
     destination.eventsHandled = source.eventsHandled;
     destination.totalMilliseconds = source.totalMilliseconds;
@@ -250,8 +252,6 @@ var tbdCombat = tbdCombat || ( function()
   {
     if ( state.tbdCombatPerformance === undefined ) {
       return {
-        // Count the number of times handleChatMessage is called
-        chatMessages: 0,
         // Count the number of times handleChatMessage is called with !combat
         combatCalls: 0,
         // Count the number of times !combat responding to a non-handleChatMessage event
@@ -588,22 +588,25 @@ var tbdCombat = tbdCombat || ( function()
   /// state is true or false
   var setTokenMarker = function( rollObject, condition, state )
   {
-    const originalMarkers = rollObject.get( Roll20.Objects.STATUS_MARKERS ).split( ',' );
-    const conditionMarkerTag = findMarkerTag( condition.marker );
-    if ( state == true ) {
-      // Add the condition
-      if ( ! originalMarkers.includes( conditionMarkerTag ) ) {
-        originalMarkers.push( conditionMarkerTag );
+    const statusMarkerString = rollObject.get( Roll20.Objects.STATUS_MARKERS );
+    if ( statusMarkerString !== undefined ) {
+      const originalMarkers = statusMarkerString.split( ',' );
+      const conditionMarkerTag = findMarkerTag( condition.marker );
+      if ( state == true ) {
+        // Add the condition
+        if ( ! originalMarkers.includes( conditionMarkerTag ) ) {
+          originalMarkers.push( conditionMarkerTag );
+        }
+      } else {
+        const index = originalMarkers.findIndex( item => item == conditionMarkerTag );
+        // Remove the condition
+        if ( index >= 0 ) {
+          originalMarkers.splice( index, 1 );
+        }
       }
-    } else {
-      const index = originalMarkers.findIndex( item => item == conditionMarkerTag );
-      // Remove the condition
-      if ( index >= 0 ) {
-        originalMarkers.splice( index, 1 );
-      }
+      const filteredMarkers = originalMarkers.filter( marker => marker.length > 0 );
+      rollObject.set( Roll20.Objects.STATUS_MARKERS, filteredMarkers.join( ',' ) );
     }
-    const filteredMarkers = originalMarkers.filter( marker => marker.length > 0 );
-    rollObject.set( Roll20.Objects.STATUS_MARKERS, filteredMarkers.join( ',' ) );
   };
 
   // Remove status marker from graphic
@@ -732,23 +735,28 @@ var tbdCombat = tbdCombat || ( function()
   // Pass an array of selectObjects presumably from a message.selected
   // Appends generated condition records to combat.records
   // combat is from currentCombat()
-  var appendConditionRecords = function( selectObjects, combat )
+  // conditionName and conditionDuration are optional
+  // conditionName is a string to match via findCondition
+  // conditionDuration is a number
+  var appendConditionRecords = function( selectObjects, combat, conditionName, conditionDuration )
   {
-    const condition = findCondition( combat.conditionPrototype.name );
-    const duration = combat.conditionPrototype.duration;
+    const condition = findCondition( conditionName === undefined ? combat.conditionPrototype.name : conditionName );
+    const duration = conditionDuration === undefined ? combat.conditionPrototype.duration : conditionDuration;
     if ( condition !== undefined ) {
       selectObjects.map( 
         function( selectObject )
         {
           // selectObjects are pure state. Call getObj to get full fledged Roll20 Objects, which have .get method
           const rollObject = getObj( selectObject._type, selectObject._id );
-          // Add the graphical status marker
-          setTokenMarker( rollObject, condition, true );
-          const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
-          if ( maybeCharacter !== undefined ) {
-            sendConditionContractedMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
-            const conditionId = ++combat.conditionCount;
-            combat.records.push( createConditionRecord( rollObject.id, condition.name, duration, conditionId ) );
+          if ( rollObject !== undefined ) {
+            // Add the graphical status marker
+            setTokenMarker( rollObject, condition, true );
+            const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
+            if ( maybeCharacter !== undefined ) {
+              sendConditionContractedMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
+              const conditionId = ++combat.conditionCount;
+              combat.records.push( createConditionRecord( rollObject.id, condition.name, duration, conditionId ) );
+            }
           }
         } );
     }
@@ -878,6 +886,7 @@ var tbdCombat = tbdCombat || ( function()
     const subStyle = 'style="font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;"';
     const anchorStyle1 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 100px;';
     const anchorStyle2 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 150px;';
+    const anchorStyle3 = 'style="text-align:center; border: 1px solid black; margin: 1px; padding: 2px; background-color: ' + blueColor + '; border-radius: 4px;  box-shadow: 1px 1px 1px #707070; width: 70px;';
 
     const name = combat.conditionPrototype.name;
     const duration = combat.conditionPrototype.duration;
@@ -886,6 +895,14 @@ var tbdCombat = tbdCombat || ( function()
       + '<tr><td>Name </td><td><a ' + anchorStyle1 + '" href="!combat setconditionname ' + conditionComboBox() + '">' + name + '</a></td></tr>'
       + '<tr><td>Duration </td><td><a ' + anchorStyle1 + '" href="!combat setconditionduration ?{Duration?|' + duration + '}">' + duration + '</a></td></tr>'
       + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat contract">Apply Condition</a>' ) + '</td></tr>'
+
+      + '<tr><td colspan=\'2\'>' 
+      + makeDiv( 
+        tableStyle, 
+        '<a ' + anchorStyle3 + '" href="!combat contract ' + kDodgingCondition + ' 1">Dodge</a>'
+          + '<a ' + anchorStyle3 + '" href="!combat contract ' + kReactionCondition + ' 1">React</a>' )
+      + '</td></tr>'
+
       + '</table>';
     const conditionDurations = combat.records.length == 0
       ? ''
@@ -1062,13 +1079,18 @@ var tbdCombat = tbdCombat || ( function()
   };
 
   // Delegate resolution of chat event
-  var handleChatMessage = function( message, performance )
+  var handleChatMessage = function( message )
   {
+    const start = Date.now();
     if ( message.type === 'api' ) {
       const tokens = message.content.split( ' ' );
       const command = tokens[ 0 ];
       if ( command === '!combat' && playerIsGM( message.playerid ) ) {
+        // Initialize performance update
+        const performance = currentPerformance();
+        const originalCallCount = performance.combatCalls;
         performance.combatCalls++;
+        // Resolve combat command
         const combat = currentCombat();
         var turnOrder = currentTurnOrder();
         if ( tokens.length == 1 ) {
@@ -1109,7 +1131,13 @@ var tbdCombat = tbdCombat || ( function()
             if ( message.selected === undefined || message.selected.length == 0 ) {
               sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for condition' );
             } else {
-              appendConditionRecords( message.selected, combat );
+              if ( tokens.length == 4 ) {
+                const conditionName = tokens[ 2 ];
+                const conditionDuration = parseInt( tokens[ 3 ] );
+                appendConditionRecords( message.selected, combat, conditionName, conditionDuration );
+              } else {
+                appendConditionRecords( message.selected, combat );
+              }
               storeCombat( combat );
               showCombatMenu( combat, turnOrder );
             }
@@ -1139,6 +1167,13 @@ var tbdCombat = tbdCombat || ( function()
             showTokenMarkers( message.playerid );
           }
         }
+        // Store performance metrics
+        if ( performance.combatCalls == originalCallCount + 1 ) {
+          const time = Date.now() - start;
+          performance.totalMilliseconds += time;
+          performance.maximumResolutionMilliseconds = Math.max( performance.maximumResolutionMilliseconds, time );
+        }
+        storePerformance( performance );
       }
     } else {
       // ignore
@@ -1226,22 +1261,7 @@ var tbdCombat = tbdCombat || ( function()
     // Ensure the combatTokenMarkers array is filled
     fillTokenMarkers();
     clearPerformance();
-    on( 
-      Roll20.Events.CHAT_MESSAGE, 
-      function( message )
-      {
-        const start = Date.now();
-        const performance = currentPerformance();
-        performance.chatMessages++;
-        const originalCallCount = performance.combatCalls;
-        handleChatMessage( message, performance );
-        if ( performance.combatCalls == originalCallCount + 1 ) {
-          const time = Date.now() - start;
-          performance.totalMilliseconds += time;
-          performance.maximumResolutionMilliseconds = Math.max( performance.maximumResolutionMilliseconds, time );
-        }
-        storePerformance( performance );
-    } );
+    on( Roll20.Events.CHAT_MESSAGE, handleChatMessage );
     on( 
       Roll20.Events.CHANGE_CAMPAIGN_TURNORDER, 
       function( newCampaign, oldCampaign )

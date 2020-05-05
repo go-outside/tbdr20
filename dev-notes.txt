@@ -1,4 +1,7 @@
 
+wraiths did not get move circles
+token list was undefined in setTokenMarkers
+
 combat clear -- remove conditions
 
 disable sight on npc tokens
