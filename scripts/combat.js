@@ -90,8 +90,14 @@ var tbdCombat = tbdCombat || ( function()
   const kContractCaster = 'contractcaster';
 
   const WhenToAdvanceCondition = {
-    AFTER_TURN : 'afterTurn',
-    BEFORE_TURN : 'beforeTurn' };
+    AFTER_TURN : 'After',
+    BEFORE_TURN : 'Before' 
+  };
+  
+  const TurnToAdvanceCondition = {
+    CASTER : 'Caster',
+    TARGET : 'Target'
+  };
 
   // Create a new condition with normalized object parameters
   // boolean perRound is true for conditions the are cleared at the top of a combat round
@@ -103,8 +109,7 @@ var tbdCombat = tbdCombat || ( function()
       name: name, 
       contract: contract, 
       recover: recover, 
-      marker: marker,
-      whenToAdvance: whenToAdvance === undefined ? WhenToAdvanceCondition.AFTER_TURN : whenToAdvance };
+      marker: marker };
   };
 
   const kReactionCondition = 'Reaction';
@@ -115,10 +120,10 @@ var tbdCombat = tbdCombat || ( function()
   // Note that two word condition names (first parameter) will require rework for resolution of api command
   var conditions = [];
   conditions.push( createCondition( 'Hunters-Mark', ' is marked.', ' is no longer marked.', 'target-arrows' ) );
-  conditions.push( createCondition( kReactionCondition, ' takes a reaction.', ' now has a reaction.', 'lightning-helix', WhenToAdvanceCondition.BEFORE_TURN ) );
-  conditions.push( createCondition( kDodgingCondition, ' starts dodging.', ' is no longer dodging.', 'dodging', WhenToAdvanceCondition.BEFORE_TURN ) );
-  conditions.push( createCondition( kReadyCondition, ' readies an action.', ' is no longer ready.', 'strong', WhenToAdvanceCondition.BEFORE_TURN ) );
-  conditions.push( createCondition( kHelpCondition, ' is helping.', ' is no longer helping.', 'all-for-one', WhenToAdvanceCondition.BEFORE_TURN ) );
+  conditions.push( createCondition( kReactionCondition, ' takes a reaction.', ' now has a reaction.', 'lightning-helix' ) );
+  conditions.push( createCondition( kDodgingCondition, ' starts dodging.', ' is no longer dodging.', 'dodging' ) );
+  conditions.push( createCondition( kReadyCondition, ' readies an action.', ' is no longer ready.', 'strong' ) );
+  conditions.push( createCondition( kHelpCondition, ' is helping.', ' is no longer helping.', 'all-for-one' ) );
   conditions.push( createCondition( 'Haste', ' is fast moving.', ' is back to normal speed.', 'sprint' ) );
   conditions.push( createCondition( 'Slow', ' is lethargic.', ' is normal.', 'snail' ) );
   conditions.push( createCondition( 'Mirror', ' has multiple images.', ' no longer has multiple images.', 'two-shadows' ) );
@@ -128,7 +133,7 @@ var tbdCombat = tbdCombat || ( function()
   conditions.push( createCondition( 'Burning', ' is engulfed in flames.', ' stops burning.', 'fire' ) );
   conditions.push( createCondition( 'True-seeing', ' has true sight.', ' no longer has true sight.', 'eye-of-horus' ) );
   conditions.push( createCondition( 'Bless', ' is blessed.', ' is no longer blessed.', 'angel-outfit' ) );
-  conditions.push( createCondition( 'Chill', ' feels touched by Death.', ' is no longer touched by Death.', 'skeletal-hand', WhenToAdvanceCondition.BEFORE_TURN ) );
+  conditions.push( createCondition( 'Chill', ' feels touched by Death.', ' is no longer touched by Death.', 'skeletal-hand' ) );
   conditions.push( createCondition( 'Transform', ' is transformed.', ' transforms back.', 'overdrive'));
   conditions.push( createCondition( 'Power', ' glows with power.', ' no longer glowing.', 'aura'));
   conditions.push( createCondition( 'Confused', ' is very confused.', ' is no longer confused.', 'stoned-skull' ) );
@@ -182,7 +187,13 @@ var tbdCombat = tbdCombat || ( function()
   // conditionId: unique identifier assigned to condition to selectively delete from condition table
   // advanceTurnGraphicId: the id of graphic on which turn condition duration advancement occurs.
   // When advanceTurnGraphicId is undefined, use graphicId instead
-  var createConditionRecord = function( graphicId, conditionName, duration, conditionId, advanceTurnGraphicId )
+  var createConditionRecord = function( 
+    graphicId, 
+    conditionName, 
+    duration, 
+    conditionId, 
+    advanceTurnGraphicId,
+    tickWhen )
   {
     return {
       conditionId: conditionId,
@@ -191,7 +202,8 @@ var tbdCombat = tbdCombat || ( function()
       // TODO: usage would require perhaps a new Apply button that set advance graphic from the current turn participant.id
       advanceTurnGraphicId: advanceTurnGraphicId,
       conditionName: conditionName,
-      duration: duration };
+      duration: duration,
+      tickWhen: tickWhen };
   };
 
   /// Deep copy conditionRecord source and return the copy
@@ -202,14 +214,19 @@ var tbdCombat = tbdCombat || ( function()
       graphicId: source.graphicId,
       advanceTurnGraphicId: source.advanceTurnGraphicId,
       conditionName: source.conditionName,
-      duration: source.duration };
+      duration: source.duration,
+      tickWhen: source.tickWhen };
   };
 
   /// Deep copy contents of source onto destination
   var copyCombat = function( source, destination )
   {
     destination.conditionCount = source.conditionCount;
-    destination.conditionPrototype = { name: source.conditionPrototype.name, duration: source.conditionPrototype.duration };
+    destination.conditionPrototype = { 
+      name: source.conditionPrototype.name, 
+      duration: source.conditionPrototype.duration,
+      tickWhen: source.conditionPrototype.tickWhen,
+      tickTurn: source.conditionPrototype.tickTurn };
     destination.round = source.round;
     destination.records = source.records.map( record => copyConditionRecord( record ) );
     destination.turn = source.turn;
@@ -221,7 +238,11 @@ var tbdCombat = tbdCombat || ( function()
     if ( state.tbdCombat === undefined ) {
       return { 
         conditionCount: 0, 
-        conditionPrototype: { name: 'Poisoned', duration: 2 }, 
+        conditionPrototype: { 
+          name: 'Poisoned', 
+          duration: 2,
+          tickWhen: WhenToAdvanceCondition.AFTER_TURN,
+          tickTurn: TurnToAdvanceCondition.TARGET }, 
         records: [], 
         round: 0, 
         turn: 0 };
@@ -621,6 +642,21 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
+  // Return the character name associated with token
+  // Return undefined if no name or character exists
+  var participantCharacterName = function( participant )
+  {
+    const graphic = getObj( Roll20.Objects.GRAPHIC, participant.id );
+    if ( graphic === undefined ) {
+      return undefined;
+    }
+    const character = getObj( Roll20.Objects.CHARACTER, graphic.get( Roll20.Verbs.REPRESENTS ) );
+    if ( character === undefined ) {
+      return undefined;
+    }
+    return character.get( Roll20.Objects.NAME );
+  }
+
   // Remove status marker from graphic
   // Send recover message
   var purgeConditionRecord = function( record )
@@ -726,7 +762,7 @@ var tbdCombat = tbdCombat || ( function()
       // Adjust only records matching the participant
       const advanceId = record.advanceTurnGraphicId === undefined ? record.graphicId : record.advanceTurnGraphicId;
       const condition = findCondition( record.conditionName );
-      if ( condition !== undefined && participant.id == advanceId && condition.whenToAdvance == whenToAdvance ) {
+      if ( condition !== undefined && participant.id == advanceId && record.tickWhen == whenToAdvance ) {
         record.duration -= 1;
         if ( record.duration <= 0 ) {
           purgeConditionRecord( record );
@@ -745,20 +781,27 @@ var tbdCombat = tbdCombat || ( function()
     }
   };
 
-  // advance mode is either kContractTarget or kContractCaster
   // On kContractCaster condition record will advance on active participant token turn
   // On kContractTarget condition record will advance on targeted token's turn
   // turnOrder is the global turn order
   // Pass an array of selectObjects presumably from a message.selected
   // Appends generated condition records to combat.records
   // combat is from currentCombat()
-  // conditionName and conditionDuration are optional
   // conditionName is a string to match via findCondition
   // conditionDuration is a number
-  var appendConditionRecords = function( advanceMode, turnOrder, selectObjects, combat, conditionName, conditionDuration )
+  // tickWhen is a string
+  // tickTurn is a string
+  var appendConditionRecords = function( 
+    turnOrder, 
+    selectObjects, 
+    combat, 
+    conditionName, 
+    conditionDuration,
+    tickWhen,
+    tickTurn )
   {
     const participantId = turnOrder.length == 0 ? undefined : turnOrder[ 0 ].id;
-    const advanceId = advanceMode == kContractTarget ? undefined : participantId;
+    const advanceId = tickTurn == TurnToAdvanceCondition.CASTER ? participantId : undefined;
     const condition = findCondition( conditionName );
     if ( condition !== undefined ) {
       selectObjects.map( 
@@ -773,7 +816,13 @@ var tbdCombat = tbdCombat || ( function()
             if ( maybeCharacter !== undefined ) {
               sendConditionContractedMessage( maybeCharacter.get( Roll20.Objects.NAME ), condition );
               const conditionId = ++combat.conditionCount;
-              combat.records.push( createConditionRecord( rollObject.id, condition.name, conditionDuration, conditionId, advanceId ) );
+              combat.records.push( createConditionRecord( 
+                rollObject.id, 
+                condition.name, 
+                conditionDuration, 
+                conditionId, 
+                advanceId,
+                tickWhen ) );
             }
           }
         } );
@@ -815,6 +864,16 @@ var tbdCombat = tbdCombat || ( function()
   {
     combat.conditionPrototype.duration = Math.max( 0, Math.floor( conditionDuration ) );
   };
+
+  var setPrototypeTickTurn = function( tickTurn, combat )
+  {
+    combat.conditionPrototype.tickTurn = tickTurn;
+  }
+
+  var setPrototypeTickWhen = function( tickWhen, combat )
+  {
+    combat.conditionPrototype.tickWhen = tickWhen;
+  }
 
   // Set the visibility state for the turn order window
   // pageViewable is boolean
@@ -908,27 +967,36 @@ var tbdCombat = tbdCombat || ( function()
 
     const name = combat.conditionPrototype.name;
     const duration = combat.conditionPrototype.duration;
+    const tickWhen = combat.conditionPrototype.tickWhen;
+    const tickTurn = combat.conditionPrototype.tickTurn;
     const conditionMenu = makeDiv( headStyle, 'Conditions' )
       + '<table style=\'margin-left:auto;margin-right:auto;\'>'
       + '<tr><td>Name </td><td><a ' + anchorStyle1 + '" href="!combat setconditionname ' + conditionComboBox() + '">' + name + '</a></td></tr>'
       + '<tr><td>Duration </td><td><a ' + anchorStyle1 + '" href="!combat setconditionduration ?{Duration?|' + duration + '}">' + duration + '</a></td></tr>'
-      + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat ' + kContractTarget + '">Apply Target</a>' ) + '</td></tr>'
-      + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat ' + kContractCaster + '">Apply Caster</a>' ) + '</td></tr>'
-
-      // TODO: add Apply button to create condition that advances with current turn participant.id
+      + '<tr><td>Tick When </td><td><a ' + anchorStyle1 + '" href="!combat setconditiontickwhen '
+        + '?{Tick when?|' + WhenToAdvanceCondition.AFTER_TURN + '|' 
+        + WhenToAdvanceCondition.BEFORE_TURN + '}">' + tickWhen + '</a></td></tr>'
+      + '<tr><td>Tick Turn </td><td><a ' + anchorStyle1 + '" href="!combat setconditiontickturn '
+        + '?{Tick turn?|' + TurnToAdvanceCondition.CASTER + '|' 
+        + TurnToAdvanceCondition.TARGET + '}">' + tickTurn + '</a></td></tr>'
+      + '<tr><td colspan=\'2\'>' + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat contract">Apply</a>' ) + '</td></tr>'
 
       + '<tr><td colspan=\'2\'>' 
       + makeDiv( 
         tableStyle, 
-        '<a ' + anchorStyle3 + '" href="!combat ' + kContractTarget + ' ' + kDodgingCondition + ' 1">Dodge</a>'
-          + '<a ' + anchorStyle3 + '" href="!combat ' + kContractTarget + ' ' + kHelpCondition + ' 1">Help</a>' )
+        '<a ' + anchorStyle3 + '" href="!combat contract ' + kDodgingCondition + ' 1 ' 
+          + WhenToAdvanceCondition.BEFORE_TURN + ' ' + TurnToAdvanceCondition.TARGET + '">Dodge</a>'
+          + '<a ' + anchorStyle3 + '" href="!combat contract ' + kHelpCondition + ' 1 '
+          + WhenToAdvanceCondition.BEFORE_TURN + ' ' + TurnToAdvanceCondition.TARGET + '">Help</a>' )
       + '</td></tr>'
 
       + '<tr><td colspan=\'2\'>' 
       + makeDiv( 
         tableStyle, 
-        '<a ' + anchorStyle3 + '" href="!combat ' + kContractTarget + ' ' + kReactionCondition + ' 1">React</a>'
-          + '<a ' + anchorStyle3 + '" href="!combat ' + kContractTarget + ' ' + kReadyCondition + ' 1">Ready</a>' )
+        '<a ' + anchorStyle3 + '" href="!combat contract ' + kReactionCondition + ' 1 '
+          + WhenToAdvanceCondition.BEFORE_TURN + ' ' + TurnToAdvanceCondition.TARGET + '">React</a>'
+          + '<a ' + anchorStyle3 + '" href="!combat contract ' + kReadyCondition + ' 1 '
+          + WhenToAdvanceCondition.BEFORE_TURN + ' ' + TurnToAdvanceCondition.TARGET + '">Ready</a>' )
       + '</td></tr>'
 
       + '</table>';
@@ -959,11 +1027,12 @@ var tbdCombat = tbdCombat || ( function()
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
     } else {
+      const participantName = participantCharacterName( turnOrder[ 0 ] );
       const round = String( combat.round );
       const menu = makeDiv(
         divStyle,
         makeDiv( headStyle, 'Combat' )
-        + makeDiv( subStyle, 'Round ' + round + ' Turns' )
+        + makeDiv( subStyle, 'Round ' + round + ( participantName === undefined ? ' Turns' : ( ', ' + participantName ) ) )
         + makeDiv( arrowStyle, '' )
           // Show option to advance turn during the round
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat add">Add Combatants</a>' )
@@ -1155,22 +1224,32 @@ var tbdCombat = tbdCombat || ( function()
             showInitiativePage( false );
             // combat is invalid after calling clearAll. Re-fetch currentCombat to show menu
             showCombatMenu( currentCombat(), turnOrder );
-          } else if ( subcommand == kContractTarget || subcommand == kContractCaster ) {
+          } else if ( subcommand == 'contract' ) {
             if ( message.selected === undefined || message.selected.length == 0 ) {
               sendChat( Roll20.ANNOUNCER, '/w gm No actors selected for condition' );
             } else {
-              if ( tokens.length == 4 ) {
+              if ( tokens.length == 6 ) {
                 const conditionName = tokens[ 2 ];
                 const conditionDuration = parseInt( tokens[ 3 ] );
-                appendConditionRecords( subcommand, turnOrder, message.selected, combat, conditionName, conditionDuration );
+                const conditionTickWhen = tokens[ 4 ];
+                const conditionTickTurn = tokens[ 5 ];
+                appendConditionRecords( 
+                  turnOrder, 
+                  message.selected, 
+                  combat, 
+                  conditionName, 
+                  conditionDuration,
+                  conditionTickWhen,
+                  conditionTickTurn );
               } else {
                 appendConditionRecords( 
-                  subcommand, 
                   turnOrder, 
                   message.selected, 
                   combat, 
                   combat.conditionPrototype.name,
-                  combat.conditionPrototype.duration );
+                  combat.conditionPrototype.duration,
+                  combat.conditionPrototype.tickWhen,
+                  combat.conditionPrototype.tickTurn );
               }
               storeCombat( combat );
               showCombatMenu( combat, turnOrder );
@@ -1190,6 +1269,14 @@ var tbdCombat = tbdCombat || ( function()
             showCombatMenu( combat, turnOrder );
           } else if ( subcommand == 'setconditionduration'  && tokens.length == 3 ) {
             setPrototypeDuration( Number( tokens[ 2 ] ), combat );
+            storeCombat( combat );
+            showCombatMenu( combat, turnOrder );
+          } else if ( subcommand == 'setconditiontickwhen' && tokens.length == 3 ) {
+            setPrototypeTickWhen( tokens[ 2 ], combat );
+            storeCombat( combat );
+            showCombatMenu( combat, turnOrder );
+          } else if ( subcommand == 'setconditiontickturn' && tokens.length == 3 ) {
+            setPrototypeTickTurn( tokens[ 2 ], combat );
             storeCombat( combat );
             showCombatMenu( combat, turnOrder );
           } else if ( subcommand == 'skipround' ) {
