@@ -222,10 +222,10 @@ var tbdBank = tbdBank || ( function()
             [ Subcommands.TRANSFER_ITEM, sourceCharacter.id, destinationCharacter.id, item.id ] );
           const transferButton = Tbdr20.makeChatButton( 'Transfer', kBankColor, transferCommand, kButtonWidth, kButtonPadding );
           return Tbdr20.makeTableRow( [ 
-            Tbdr20.makeTableCell( item.name ),
-            Tbdr20.makeTableCell( transferButton ) ] );
+            Tbdr20.makeTableCell( transferButton ),
+            Tbdr20.makeTableCell( item.name ) ] );
         } ),
-      'margin-left:auto; margin-right:auto; font-size: 10px; width: 215px' );
+      'font-size: 10px; width: 215px' );
   };
 
   // Create a new account object
