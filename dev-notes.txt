@@ -1,8 +1,142 @@
 
+Bank functions for selected token's character
+Disable bank when Bank Ledger is improperly formatted
+
+https://gist.github.com/VoltCruelerz/0e4b939c01576a2c76cc398253a397d3
+
+Carpet of Flying
+{"name":"repeating_inventory_-LvWpXnl3NAAAFNsPg12_itemname","current":"Carpet of Flying","max":"","_id":"-LvWpXpAfYwKVz29oC9o","_type":"attribute","_characterid":"-K-9JySUkBoarmyzKCXO"}
+{"name":"repeating_inventory_-LvWpXnl3NAAAFNsPg12_itemcontent","current":"You can speak the carpet's command word as an action to make the carpet hover and fly. It moves according to your spoken directions, provided that you are within 30 feet of it.\n\nFour sizes of carpet of flying&nbsp;exist. The GM chooses the size of a given carpet or determines it randomly.\n\n**d100****Size****Capacity****Flying Speed**01-203 ft. x 5 ft.200 lb.80 feet21-554 ft. x 6 ft.400 lb.60 feet56-805 ft. x 7 ft.600 lb.40 feet81-1006 ft. x 9 ft.800 lb.30 feetA carpet can carry up to twice the weight shown on the table, but it flies at half speed if it carries more than its normal capacity.","max":"","_id":"-LvWpXpYywj0xWH1j_7o","_type":"attribute","_characterid":"-K-9JySUkBoarmyzKCXO"}
+{"name":"repeating_inventory_-LvWpXnl3NAAAFNsPg12_itemmodifiers","current":"Item Type: Adventuring Gear","max":"","_id":"-LvWpXpn1Zz85AGhwgWj","_type":"attribute","_characterid":"-K-9JySUkBoarmyzKCXO"}
+{"name":"repeating_inventory_-LvWpXnl3NAAAFNsPg12_itemweight","current":"1","max":"","_id":"-LvWpbA40EIK98_BGHR4","_type":"attribute","_characterid":"-K-9JySUkBoarmyzKCXO"}
+
+Hard to say what the problem is. Here's a guess: you are creating a new attribute on the target character via createObj(). Unfortunately, this does not trigger sheet workers; you'd have to create it first, then set all the attributes via setWithWorker().
+
+            // Hunt for the _itemname entry and return its row.
+            getRowIdFromAttribute : function(attrName) {
+                log(`getRowIdFromAttribute{${attrName})`);
+                var regex = new RegExp(this.PREFIX + '(.+?)(?:' + this.NAME_SUFFIX + '|' + this.EQUIPPED_SUFFIX + ')');
+                return regex.exec(attrName) ? regex.exec(attrName)[1] : '';
+            },
+
+            // Return all attribute objects for an inventory rowId
+            getAllFromCharAndRowId : function(charId, rowId) {
+                return [
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.COUNT_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.NAME_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.WEIGHT_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.EQUIPPED_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.USEASARESOURCE_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.HASATTACK_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.PROPERTIES_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.MODIFIERS_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.CONTENT_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.ATTACKID_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.RESOURCEID_SUFFIX),
+                    this.findForCharacterAndRowIdAndSuffix(charId, rowId, this.INVENTORYSUBFLAG_SUFFIX)
+                ];
+            },
+
+var equipped = this.findEquippedForCharacterAndRowId(charId, rowId);
+                equipped.setWithWorker({current: this.isEquipped(equipped) ? this.UNCHECKED : this.CHECKED});
+
+            // These have to be the string equivalent, otherwise the sheet worker will not pick up the change
+            CHECKED : '1',
+            UNCHECKED : '0',
+
+            cleanForDeletion : function(equipAttr, attackAttr, resourceAttr, countAttr) {
+                equipAttr.setWithWorker({current: this.UNCHECKED});
+                attackAttr.setWithWorker({current: this.UNCHECKED});
+                resourceAttr.setWithWorker({current: this.UNCHECKED});
+                countAttr.setWithWorker({current: '0'});
+            },
+
+        findUnequippedItemsForCharacter = function(charId){
+            log(`findUnequippedItemsForCharacter{${charId})`);
+            return filterItemAttrsForCharacterAndSuffixAndValue(charId, ITEM.EQUIPPED_SUFFIX, ITEM.UNEQUIPPED)
+        },
+
+_itemname
+_itemcount
+_itemweight
+_hasattack
+_itemattackid
+_itemcontent
+_equipped
+_itemmodifiers
+_itemproperties
+_itemresourceid
+_useasresource
+_inventorysubflag
+
+      var handouts = findObjs({                              
+          _type: 'handout'
+      }, {caseInsensitive: true});
+          _.each(handouts, function(handout){
+              loadHandout(handout, false);
+          });
+
+handout object:
+_id
+_type : "handout"
+avatar : "", url to image used for handout
+name : "Mysterious Note"
+notes : "", contains text in the handout
+gmnotes : "", contains gm only text
+inplayerjournals : "", comma delimited list of player id's who can see handout, use "all" for all players
+controlledby : "", list of players with edit permissions, "all" for all aplayers
+
+The API does not have access to the folder hierarchy. API created handouts will be placed at the root level.
+
+Getting notes, gmnotes, and bio is asynchronous:
+
+var character = getObj("character", "-JMGkBaMgMWiQdNDwjjS");
+character.get("bio", function(bio) {
+    log(bio); //do something with the character bio here.
+});
+make sure to set via .set( ... ) using createObj as setter fails silently
+
+Setter and getter for attributes (money):
+  var getattr = function getattr(cid, att) {
+    //! getattr
+    var attr = findObjs({
+      type: 'attribute',
+      characterid: cid,
+      name: att
+    })[0];
+    if (attr) {
+      return attr.get('current');
+    }
+    return '';
+  };
+
+  var setattr = function setattr(charId, attrName, val) {
+    //! setattr
+    var attr = findObjs({
+      type: 'attribute',
+      characterid: charId,
+      name: attrName
+    })[0];
+    if (typeof attr === 'undefined' || attr == null) {
+      var _attr = createObj('attribute', { name: attrName, characterid: charId, current: parseFloat(val) }); // eslint-disable-line no-unused-vars, no-undef, no-shadow
+    } else {
+      attr.setWithWorker({
+        current: parseFloat(val)
+      }); // .set()
+    }
+  };
+
+ setattr(subject.id, 'pp', parseFloat(account[0]));
+
+
+
+
+
+
+
 wraiths did not get move circles
 token list was undefined in setTokenMarkers
 
-combat clear -- remove conditions
 
 disable sight on npc tokens
 make as few dynamic lighting lines as possible

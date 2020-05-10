@@ -687,7 +687,10 @@ var tbdCombat = tbdCombat || ( function()
         // selectObjects are pure state. Call getObj to get full fledged Roll20 Objects, which have .get method
         const rollObject = getObj( selectObject._type, selectObject._id );
         const maybeCharacter = getObj( Roll20.Objects.CHARACTER, rollObject.get( Roll20.Verbs.REPRESENTS ) );
-        if ( maybeCharacter !== undefined ) {
+        if ( maybeCharacter === undefined ) {
+          const graphicName = rollObject.get( Roll20.Objects.NAME );
+          sendChat( Roll20.ANNOUNCER, '/w gm Token is not linked to a character and was omitted from combat.' );
+        } else {
           // It is not clear why .id works here and ._id does not
           // log( maybeCharacter ) shows "_id":"<value>"
           // Perhaps the non-underscore values must be retrieved via .get
@@ -1027,7 +1030,7 @@ var tbdCombat = tbdCombat || ( function()
           + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!combat clear">Clear</a>' ) );
       sendChat( Roll20.ANNOUNCER, '/w gm ' + menu );
     } else {
-      const participantName = participantCharacterName( turnOrder[ 0 ] );
+      const participantName = turnOrder.length == 0 ? undefined : participantCharacterName( turnOrder[ 0 ] );
       const round = String( combat.round );
       const menu = makeDiv(
         divStyle,
