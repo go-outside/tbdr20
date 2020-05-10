@@ -6,13 +6,12 @@ var tbdBank = tbdBank || ( function()
   'use strict';
   
   const Subcommands = {
+    CASH_TRANSACTION : 'cashtransaction',
+    DEPOSIT_MENU : 'depositmenu',
+    WITHDRAW_MENU : 'withdrawmenu',
     SELF_BALANCE : 'selfbalance',
     SHARED_BALANCE : 'sharedbalance',
-    WITHDRAW_MENU : 'withdrawmenu',
-    WITHDRAW_CASH : 'withdrawcash',
-    DEPOSIT_MENU : 'depositmenu',
-    DEPOSIT_CASH : 'depositcash',
-    CASH_TRANSACTION : 'cashtransaction'
+    TRANSFER_ITEM : 'transferitem'
   };
 
   const TransactionKind = {
@@ -45,9 +44,15 @@ var tbdBank = tbdBank || ( function()
         const character = Tbdr20.firstCharacterWithName( kBankCharacterName );
         Tbdr20.whisperPlayer( player, accountBalanceDisplay( createCharacterAccount( character ), kBankCharacterName ) );
       } else if ( subcommand == Subcommands.WITHDRAW_MENU || subcommand == Subcommands.DEPOSIT_MENU ) {
+        const startTime = Date.now();
         doTransactionMenu( player, message, tokens );
+        Tbdr20.whisperPlayer( player, 'Transaction menu time: ' + parseInt( Date.now() - startTime ) + ' ms' );
       } else if ( subcommand == Subcommands.CASH_TRANSACTION ) {
         doCashTransaction( player, tokens );
+      } else if ( subcommand == Subcommands.TRANSFER_ITEM ) {
+        const startTime = Date.now();
+        doItemTransfer( player, tokens );
+        Tbdr20.whisperPlayer( player, 'Transfer item time: ' + parseInt( Date.now() - startTime ) + ' ms' );
       }
     }
   };
@@ -99,6 +104,7 @@ var tbdBank = tbdBank || ( function()
       const sourceCharacter = getObj( Tbdr20.Objects.CHARACTER, tokens[ 2 ] );
       const destinationCharacter = getObj( Tbdr20.Objects.CHARACTER, tokens[ 3 ] );
       const transaction = createCashAccount();
+      // Token sequence here is paired with cashTransactionInputs
       transaction.pp = parseInt( tokens[ 4 ] );
       transaction.gp = parseInt( tokens[ 5 ] );
       transaction.ep = parseInt( tokens[ 6 ] );
@@ -116,6 +122,25 @@ var tbdBank = tbdBank || ( function()
       }
     } else {
       Tbdr20.whisperPlayer( player, 'Transaction failure. Input formatted incorrectly' );
+    }
+  };
+
+  var doItemTransfer = function( player, tokens )
+  {
+    if ( tokens.length == 5 ) {
+      const sourceCharacter = getObj( Tbdr20.Objects.CHARACTER, tokens[ 2 ] );
+      const destinationCharacter = getObj( Tbdr20.Objects.CHARACTER, tokens[ 3 ] );
+      const itemAttributeCollection = Tbdr20.collectInventoryItemAttributeCollection( sourceCharacter, tokens[ 4 ] );
+      if ( Tbdr20.collectionIsNotEmpty( itemAttributeCollection ) ) {
+        Tbdr20.cleanAttributeCollection( itemAttributeCollection );
+        Tbdr20.copyCollectionToCharacter( destinationCharacter, itemAttributeCollection );
+        Tbdr20.removeAttributes( itemAttributeCollection );
+        Tbdr20.whisperPlayer( player, 'Transfer successful. Thank you for banking with ' + Tbdr20.Announcer + '.' );
+      } else {
+        Tbdr20.whisperPlayer( player, 'Item transfer failure. Item does not exist' );
+      }
+    } else {
+      Tbdr20.whisperPlayer( player, 'Item transfer failure. Input formatted incorrectly' );
     }
   };
 
@@ -147,7 +172,9 @@ var tbdBank = tbdBank || ( function()
     return Tbdr20.makeMenu( kMenuWidth,
       [ Tbdr20.makeHeader( kind, kBankColor ),
         Tbdr20.makeHorizontalSpacer( kBankColor ),
-        Tbdr20.makeTable( [ Tbdr20.makeTableRow( [ Tbdr20.makeTableCell( transactButton ) ] ) ], '' )
+        Tbdr20.makeTable( [ Tbdr20.makeTableRow( [ Tbdr20.makeTableCell( transactButton ) ] ) ], '' ),
+        Tbdr20.makeHorizontalSpacer( kBankColor ),
+        inventoryTable( sourceCharacter, destinationCharacter )
       ].join( '' ) );
   };
 
@@ -155,6 +182,7 @@ var tbdBank = tbdBank || ( function()
   // promptPrefix might be 'Deposit' or 'Withdraw'
   var cashTransactionInputs = function( account, promptPrefix )
   {
+    // Coin sequence here is paired with doCashTransaction
     return [ Tbdr20.Coins.PP, Tbdr20.Coins.GP, Tbdr20.Coins.EP, Tbdr20.Coins.SP, Tbdr20.Coins.CP ].map(
       function( coin )
       {
@@ -179,6 +207,25 @@ var tbdBank = tbdBank || ( function()
             Tbdr20.makeTableRow( [ Tbdr20.makeTableCell( String( account.pp ) + ' ' + Tbdr20.Coins.PP ) ] ) ],
           '' )
       ].join( '' ) );
+  };
+
+  var inventoryTable = function( sourceCharacter, destinationCharacter )
+  {
+    const kButtonWidth = 50;
+    const kButtonPadding = 0;
+    const inventory = Tbdr20.collectInventoryItems( sourceCharacter );
+    return Tbdr20.makeTable(
+      inventory.map( 
+        function( item )
+        {
+          const transferCommand = Tbdr20.makeHrefApiCall( kBankCommand,
+            [ Subcommands.TRANSFER_ITEM, sourceCharacter.id, destinationCharacter.id, item.id ] );
+          const transferButton = Tbdr20.makeChatButton( 'Transfer', kBankColor, transferCommand, kButtonWidth, kButtonPadding );
+          return Tbdr20.makeTableRow( [ 
+            Tbdr20.makeTableCell( item.name ),
+            Tbdr20.makeTableCell( transferButton ) ] );
+        } ),
+      'margin-left:auto; margin-right:auto; font-size: 10px; width: 215px' );
   };
 
   // Create a new account object
@@ -242,13 +289,14 @@ var tbdBank = tbdBank || ( function()
     return newAccount;
   };
 
-  // Return an array of coin types that have negative values
+  // Return an array of values and types with negative values
   var overdrawnCoins = function( account )
   {
     const types = [];
     for ( const key in account ) {
-      if ( account[ key ] < 0 ) {
-        types.push( key );
+      const coinCount = account[ key ];
+      if ( coinCount < 0 ) {
+        types.push( String( coinCount ) + ' ' + key );
       }
     }
     return types;
@@ -272,7 +320,7 @@ var tbdBank = tbdBank || ( function()
   var updateCharacterFromAccount = function( character, account )
   {
     for ( const key in account ) {
-      const possibleAttributes = findObjs( { type: Tbdr20.Objects.ATTRIBUTE, characterid: character.id, name: key } );
+      const possibleAttributes = findObjs( { _type: Tbdr20.Objects.ATTRIBUTE, characterid: character.id, name: key } );
       if ( possibleAttributes.length == 1 ) {
         const attribute = possibleAttributes[ 0 ];
         attribute.setWithWorker( { current: account[ key ] } );
