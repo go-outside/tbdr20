@@ -33,6 +33,7 @@ var Tbdr20 = Tbdr20 || ( function()
     _ONLINE : '_online',
     _PAGEID : '_pageid',
     _TYPE : '_type',
+    ATTRIBUTE : 'attribute',
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
     CONTROLLEDBY : 'controlledby',
@@ -63,6 +64,15 @@ var Tbdr20 = Tbdr20 || ( function()
     return findObjs( { _type: Objects.PLAYER, _online: true } )
       .map( entry => entry.get( Objects._ID ) )
       .find( id => playerIsGM( id ) );
+  };
+
+  // Return the first character object with the given name
+  var firstCharacterWithName = function( name )
+  {
+    const matchingCharacters = findObjs( { type: Objects.CHARACTER, name: name } );
+    return matchingCharacters.length == 0
+      ? undefined
+      : matchingCharacters[ 0 ];
   };
 
   // Return the character object associated with the given graphic token tokenId
@@ -113,7 +123,7 @@ var Tbdr20 = Tbdr20 || ( function()
     return '<a style="text-align:center; border: 1px solid black; margin: 1px; padding 2px; background-color: '
       + backgroundColor + '; border-radius: 4px; box-shadow: 1px 1px 1px #707070;'
       + ( width === undefined ? '' : ' width: ' + width + 'px;' ) + '" href="' 
-      + hrefString + '">' + text + '</a>';
+      + hrefString + '"><b>' + text + '</b></a>';
   };
 
   // Return a html string <td> entry enclosing content and having colspan matching columnSpan
@@ -126,13 +136,13 @@ var Tbdr20 = Tbdr20 || ( function()
   // Assemble an array of cells from makeTableCell into a row, <tr>
   var makeTableRow = function( cells )
   {
-    return '<tr>' + cells.join() + '<\tr>';
+    return '<tr>' + cells.join( '' ) + '</tr>';
   };
 
   // Assemble a html table from an array of rows from makeTableRow
   var makeTable = function( rows, style )
   {
-    return '<table style="' + style + '">' + rows.join() + '</table>';
+    return '<table style="' + style + '">' + rows.join( '' ) + '</table>';
   };
 
   // Helper function that constructs a div html element with a specified style
@@ -160,7 +170,7 @@ var Tbdr20 = Tbdr20 || ( function()
   };
 
   // Return sub header text to place below the header
-  var makeSubHeader = function( text, color )
+  var makeSubHeader = function( text )
   {
     return makeDiv(
       'font-size: 11px; line-height: 13px; margin-top: -3px; font-style: italic;',
@@ -183,14 +193,14 @@ var Tbdr20 = Tbdr20 || ( function()
 
   // Return a menu with body contents and assigned width in pixels
   // 'px' is appended to the value of width
-  var makeMenu = function( body, width )
+  var makeMenu = function( width, body )
   {
     return makeDiv(
       'width: ' + width + 'px; border: 1px solid black; background-color: #ffffff; padding: 5px;',
       body );
   };
 
-
+/*
   generateUUID : function() {
     var a = 0;
     var b = [];
@@ -226,7 +236,15 @@ return this.generateUUID()().replace(/_/g, "Z");
 }
 },
 
+*/
 
+  // Send a chat whisper to the player
+  // player is a player object
+  // message is a string
+  var whisperPlayer = function( player, message )
+  {
+    sendChat( Announcer, '/w "' + player.get( Objects.DISPLAY_NAME ) + '" ' + message );
+  };
 
   return {
     // string
@@ -249,6 +267,8 @@ return this.generateUUID()().replace(/_/g, "Z");
     characterNameFromTokenId: characterNameFromTokenId,
     // function( messageString )
     extractApiTokens: extractApiTokens,
+    // function( name )
+    firstCharacterWithName: firstCharacterWithName,
     // function( text, backgroundColor, hrefString, width )
     makeChatButton: makeChatButton,
     // function( prompt, options )
@@ -259,9 +279,9 @@ return this.generateUUID()().replace(/_/g, "Z");
     makeHorizontalSpacer: makeHorizontalSpacer,
     // function( apiCommandWithBang, inputs )
     makeHrefApiCall: makeHrefApiCall,
-    // function( body, width )
+    // function( width, body )
     makeMenu: makeMenu,
-    // function( text, color )
+    // function( text )
     makeSubHeader: makeSubHeader,
     // function( rows, style )
     makeTable: makeTable,
@@ -270,7 +290,9 @@ return this.generateUUID()().replace(/_/g, "Z");
     // function( cells )
     makeTableRow: makeTableRow,
     // function( prompt, currentValue )
-    makeTextInput: makeTextInput
+    makeTextInput: makeTextInput,
+    // function( player, message )
+    whisperPlayer: whisperPlayer
   };
 } )();
 
