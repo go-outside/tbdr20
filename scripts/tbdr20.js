@@ -299,15 +299,17 @@ var Tbdr20 = Tbdr20 || ( function()
 
   // Return a html string <td> entry enclosing content and having colspan matching columnSpan
   // When columnSpan is undefined, colspan is 1
-  var makeTableCell = function( content, columnSpan )
+  // style is optional
+  var makeTableCell = function( content, columnSpan, style )
   {
-    return '<td colspan="' + ( columnSpan === undefined ? 1 : columnSpan ) + '">' + content + '</td>';
+    return '<td colspan="' + ( columnSpan === undefined ? 1 : columnSpan ) + '"'
+      + ( style === undefined ? '' : ' style="' + style + '"' ) + '>' + content + '</td>';
   };
 
   // Assemble an array of cells from makeTableCell into a row, <tr>
-  var makeTableRow = function( cells )
+  var makeTableRow = function( cells, style )
   {
-    return '<tr>' + cells.join( '' ) + '</tr>';
+    return '<tr' + ( style === undefined ? '' : ' style="' + style + '"' ) + '>' + cells.join( '' ) + '</tr>';
   };
 
   // Assemble a html table from an array of rows from makeTableRow

@@ -6,12 +6,15 @@ var tbdBank = tbdBank || ( function()
   'use strict';
   
   const Subcommands = {
+    ADD_ACCOUNT : 'addaccount',
     CASH_TRANSACTION : 'cashtransaction',
+    CLEAR_ACCOUNTS : 'clearaccounts',
     DEPOSIT_MENU : 'depositmenu',
-    WITHDRAW_MENU : 'withdrawmenu',
+    MAKE_IT_RAIN : 'makeitrain',
     SELF_BALANCE : 'selfbalance',
     SHARED_BALANCE : 'sharedbalance',
-    TRANSFER_ITEM : 'transferitem'
+    TRANSFER_ITEM : 'transferitem',
+    WITHDRAW_MENU : 'withdrawmenu'
   };
 
   const TransactionKind = {
@@ -35,7 +38,7 @@ var tbdBank = tbdBank || ( function()
     }
     const player = getObj( Tbdr20.Objects.PLAYER, message.playerid );
     if ( tokens.length == 1 ) {
-      Tbdr20.whisperPlayer( player, mainMenu() );
+      Tbdr20.whisperPlayer( player, mainMenu( player ) );
     } else if ( tokens.length > 1 ) {
       const subcommand = tokens[ 1 ];
       if ( subcommand == Subcommands.SELF_BALANCE ) {
@@ -53,6 +56,17 @@ var tbdBank = tbdBank || ( function()
         const startTime = Date.now();
         doItemTransfer( player, tokens );
         Tbdr20.whisperPlayer( player, 'Transfer item time: ' + parseInt( Date.now() - startTime ) + ' ms' );
+      } else if ( playerIsGM( player.id ) ) {
+        if ( subcommand == Subcommands.ADD_ACCOUNT ) {
+          doAddRainAccount( player, message );
+          Tbdr20.whisperPlayer( player, mainMenu( player ) );
+        } else if ( subcommand == Subcommands.CLEAR_ACCOUNTS ) {
+          storeRainAccounts( [] );
+          Tbdr20.whisperPlayer( player, mainMenu( player ) );
+        } else if ( subcommand == Subcommands.MAKE_IT_RAIN ) {
+          doMakeItRain( player, tokens );
+          Tbdr20.whisperPlayer( player, mainMenu( player ) );
+        }
       }
     }
   };
@@ -125,6 +139,67 @@ var tbdBank = tbdBank || ( function()
     }
   };
 
+  // Distribute indicated cash evenly amongst rain accounts
+  var doMakeItRain = function( player, tokens )
+  {
+    const accounts = currentRainAccounts();
+    if ( tokens.length == 7 ) {
+      const transaction = createCashAccount();
+      // Token sequence here is paired with cashTransactionInputs
+      transaction.pp = parseInt( tokens[ 2 ] );
+      transaction.gp = parseInt( tokens[ 3 ] );
+      transaction.ep = parseInt( tokens[ 4 ] );
+      transaction.sp = parseInt( tokens[ 5 ] );
+      transaction.cp = parseInt( tokens[ 6 ] );
+      const rainTrackers = accounts.map(
+        function( account )
+        {
+          const character = getObj( Tbdr20.Objects.CHARACTER, account.characterId );
+          return { 
+            rainAccount: account, 
+            character: character,
+            cashAccount: createCashAccount() };
+        } ).filter( tracker => tracker.character !== undefined );
+      if ( rainTrackers.length == 0 ) {
+        Tbdr20.whisperPlayer( player, 'No rain valid accounts are available to accept cash' );
+      } else {
+        // Sort trackers so account with smallest differential occurs first
+        // Remaining coins will be given to characters who have received less
+        rainTrackers.sort( ( a, b ) => a.rainAccount.differential - b.rainAccount.differential );
+        for ( var key in transaction ) {
+          var available = transaction[ key ];
+          const remainder = available % rainTrackers.length;
+          const fairShare = Math.floor( available / rainTrackers.length );
+          rainTrackers.forEach(
+            function( tracker, trackerIndex )
+            {
+              tracker.cashAccount[ key ] += trackerIndex < remainder ? fairShare + 1 : fairShare;
+            } );
+        }
+        var maximumDifferential = 0;
+        // rainTrackers keeps a reference to values in accounts array. 
+        // Update differentials
+        // Add funds to character inventories
+        rainTrackers.forEach(
+          function( tracker )
+          {
+            const goldEquivalent = valueInGold( tracker.cashAccount );
+            tracker.rainAccount.differential += goldEquivalent;
+            maximumDifferential = Math.max( maximumDifferential, tracker.rainAccount.differential );
+            updateCharacterFromAccount( 
+              tracker.character, 
+              tellerTransact( tracker.cashAccount, createCharacterAccount( tracker.character ) ) );
+Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' received ' + goldEquivalent + ' gp equivalent' );
+          } );
+        // Drop differentials by maximum value so at least one account hits zero
+        accounts.forEach( account => account.differential -= maximumDifferential );
+        storeRainAccounts( accounts );
+      }
+    } else {
+      Tbdr20.whisperPlayer( player, 'Invalid make it rain transaction.' );
+    }
+  };
+
   var doItemTransfer = function( player, tokens )
   {
     if ( tokens.length == 5 ) {
@@ -145,7 +220,7 @@ var tbdBank = tbdBank || ( function()
   };
 
   // Create the main menu
-  var mainMenu = function()
+  var mainMenu = function( player )
   {
     const kMenuWidth = 220;
     const kButtonWidth = 200;
@@ -157,6 +232,7 @@ var tbdBank = tbdBank || ( function()
         + Tbdr20.makeChatButton( TransactionKind.WITHDRAW, kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.WITHDRAW_MENU ] ), kButtonWidth )
         + Tbdr20.makeChatButton( 'Personal Balance', kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.SELF_BALANCE ] ), kButtonWidth )
         + Tbdr20.makeChatButton( 'Shared Balance', kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.SHARED_BALANCE ] ), kButtonWidth )
+        + ( playerIsGM( player.id ) ? makeItRainMenu() : '' )
       );
   };
 
@@ -186,7 +262,7 @@ var tbdBank = tbdBank || ( function()
     return [ Tbdr20.Coins.PP, Tbdr20.Coins.GP, Tbdr20.Coins.EP, Tbdr20.Coins.SP, Tbdr20.Coins.CP ].map(
       function( coin )
       {
-        return Tbdr20.makeTextInput( promptPrefix + ' ' + coin + ' (' + String( account[ coin ] ) + ')', 0 );
+        return Tbdr20.makeTextInput( promptPrefix + ' ' + coin + ' (' + String( account[ coin ] ) + ' max)', 0 );
       } );
   };
 
@@ -223,7 +299,7 @@ var tbdBank = tbdBank || ( function()
           const transferButton = Tbdr20.makeChatButton( 'Transfer', kBankColor, transferCommand, kButtonWidth, kButtonPadding );
           return Tbdr20.makeTableRow( [ 
             Tbdr20.makeTableCell( transferButton ),
-            Tbdr20.makeTableCell( item.name ) ] );
+            Tbdr20.makeTableCell( item.name, 1, 'text-align: right;' ) ] );
         } ),
       'font-size: 10px; width: 215px' );
   };
@@ -329,6 +405,97 @@ var tbdBank = tbdBank || ( function()
       }
     }
   };
+
+  var makeItRainMenu = function()
+  {
+    const accounts = currentRainAccounts();
+    const kButtonWidth = 200;
+    const kTableAndTrStyle = 'width: 200px;';
+    return [ 
+      Tbdr20.makeHorizontalSpacer( kBankColor ),
+      Tbdr20.makeHeader( 'Rain Accounts', kBankColor ),
+      Tbdr20.makeHorizontalSpacer( kBankColor ),
+      Tbdr20.makeTable( accounts.map(
+        function( account )
+        {
+          const character = getObj( Tbdr20.Objects.CHARACTER, account.characterId );
+          const name = character === undefined ? 'Name Unknown' : character.get( Tbdr20.Objects.NAME );
+          return Tbdr20.makeTableRow( 
+            [ Tbdr20.makeTableCell( name ),
+              Tbdr20.makeTableCell( account.differential.toFixed( 2 ), 1, 'text-align: right;' ) ],
+              kTableAndTrStyle );
+        } ),
+        kTableAndTrStyle ),
+      Tbdr20.makeChatButton( 'Add Account', kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.ADD_ACCOUNT ] ), kButtonWidth ),
+      Tbdr20.makeChatButton( 'Clear Accounts', kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.CLEAR_ACCOUNTS ] ), kButtonWidth ),
+      Tbdr20.makeChatButton( 
+        'Make it rain!', 
+        kBankColor, 
+        Tbdr20.makeHrefApiCall( 
+          kBankCommand, 
+          [ Subcommands.MAKE_IT_RAIN ].concat( cashTransactionInputs( createCashAccount(), 'Be Generous!' ) ) ), 
+        kButtonWidth )
+      ].join( '' );
+  };
+
+  var doAddRainAccount = function( player, message )
+  {
+    if ( message.selected !== undefined && message.selected.length > 0 ) {
+      const accounts = currentRainAccounts();
+      const accountCount = accounts.length;
+      message.selected.forEach(
+        function( token )
+        {
+          const character = Tbdr20.characterObjectFromTokenId( token._id );
+          if ( character !== undefined ) {
+            if ( accounts.findIndex( account => account.characterId === character.id ) == -1 ) {
+              // Add the account only if it is not already registered
+              accounts.push( createRainAccount( character ) );
+            }
+          }
+        } );
+      if ( accountCount != accounts.length ) {
+        // Reset the differentials
+        accounts.forEach( account => account.differential = 0 );
+      }
+      storeRainAccounts( accounts );
+    } else {
+      Tbdr20.whisperPlayer( player, 'Add account failure. Select a token and try again.' );
+    }
+  };
+
+  // Create a new rain accout to collect funds from "Make It Rain"
+  // character is a character object
+  // differential is the gp value this account has received less than the maximum rain account
+  // A differential value of zero implies this account has received the most funds
+  var createRainAccount = function( character )
+  {
+    return { characterId: character.id, differential: 0 };
+  };
+
+  var copyRainAccount = function( account )
+  {
+    return { characterId: account.characterId, differential: account.differential };
+  };
+
+  // Return the array of rain accounts stored in tbdBank state or an empty array if there is no state
+  var currentRainAccounts = function()
+  {
+    if ( state.tbdBank === undefined || state.tbdBank.rainAccounts === undefined ) {
+      state.tbdBank = { rainAccounts: [] };
+    }
+    return state.tbdBank.rainAccounts.map( account => copyRainAccount( account ) );
+  };
+
+  // Write the array of rain accounts to tbdBank state
+  var storeRainAccounts = function( accounts )
+  {
+    if ( state.tbdBank === undefined ) {
+      state.tbdBank = {};
+    }
+    state.tbdBank.rainAccounts = accounts.map( account => copyRainAccount( account ) );
+  };
+
 
   var registerEventHandlers = function()
   {
