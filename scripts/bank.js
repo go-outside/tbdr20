@@ -10,11 +10,13 @@ var tbdBank = tbdBank || ( function()
     CASH_TRANSACTION : 'cashtransaction',
     CLEAR_ACCOUNTS : 'clearaccounts',
     DEPOSIT_MENU : 'depositmenu',
+    DIRECT_AWARD : 'directaward',
     MAKE_IT_RAIN : 'makeitrain',
     SELF_BALANCE : 'selfbalance',
     SHARED_BALANCE : 'sharedbalance',
     TRANSFER_ITEM : 'transferitem',
-    WITHDRAW_MENU : 'withdrawmenu'
+    WITHDRAW_MENU : 'withdrawmenu',
+    WITHDRAW_AND_SPEND : 'withdrawandspend'
   };
 
   const TransactionKind = {
@@ -56,12 +58,17 @@ var tbdBank = tbdBank || ( function()
         const startTime = Date.now();
         doItemTransfer( player, tokens );
         Tbdr20.whisperPlayer( player, 'Transfer item time: ' + parseInt( Date.now() - startTime ) + ' ms' );
+      } else if ( subcommand == Subcommands.WITHDRAW_AND_SPEND ) {
+        doWithdrawAndSpend( player, message, tokens );
       } else if ( playerIsGM( player.id ) ) {
         if ( subcommand == Subcommands.ADD_ACCOUNT ) {
           doAddRainAccount( player, message );
           Tbdr20.whisperPlayer( player, mainMenu( player ) );
         } else if ( subcommand == Subcommands.CLEAR_ACCOUNTS ) {
           storeRainAccounts( [] );
+          Tbdr20.whisperPlayer( player, mainMenu( player ) );
+        } else if ( subcommand == Subcommands.DIRECT_AWARD ) {
+          doDirectAward( player, message, tokens );
           Tbdr20.whisperPlayer( player, mainMenu( player ) );
         } else if ( subcommand == Subcommands.MAKE_IT_RAIN ) {
           doMakeItRain( player, tokens );
@@ -132,11 +139,84 @@ var tbdBank = tbdBank || ( function()
         const collectedDestinationAccount = tellerTransact( transaction, createCharacterAccount( destinationCharacter ) );
         updateCharacterFromAccount( destinationCharacter, collectedDestinationAccount );
         updateCharacterFromAccount( sourceCharacter, drawnSourceAccount );
-        Tbdr20.whisperPlayer( player, 'Transaction successful. Thank you for banking with ' + Tbdr20.Announcer + '.' );
+        const destinationName = destinationCharacter.get( Tbdr20.Objects.NAME );
+        const actorName = destinationName == kBankCharacterName ? sourceCharacter.get( Tbdr20.Objects.NAME ) : destinationName;
+        const actionVerb = destinationName == kBankCharacterName ? 'deposited' : 'withdrew';
+        sendChat( Tbdr20.Announcer, actorName + ' ' + actionVerb + ' ' + coinCountMessage( transaction ) 
+          + '. Thank you for banking with ' + Tbdr20.Announcer + '.' );
       }
     } else {
       Tbdr20.whisperPlayer( player, 'Transaction failure. Input formatted incorrectly' );
     }
+  };
+
+  var doWithdrawAndSpend = function( player, message, tokens )
+  {
+    if ( message.selected === undefined || message.selected.length == 0 ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Select token for character spending money.' );
+      return;
+    }
+    // Add half a copper piece to avoid float precision cutoff
+    const price = Math.floor( parseFloat( tokens[ 2 ] ) * 100 + 0.5 ) / 100;
+    if ( isNaN( price ) ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Invalid price.' );
+      return;
+    }
+    const sourceCharacter = Tbdr20.firstCharacterWithName( kBankCharacterName );
+    const selectedTokenId = message.selected[ 0 ]._id;
+    const spendingCharacter = Tbdr20.characterObjectFromTokenId( selectedTokenId );
+    if ( sourceCharacter === undefined ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Bank Ledger is unavailable.' );
+      return;
+    }
+    if ( spendingCharacter === undefined ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Spender is unavailable.' );
+      return;
+    }
+    const sourceAccount = createCharacterAccount( sourceCharacter );
+    const currentBalance = valueInGold( sourceAccount );
+    if ( price > currentBalance ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Insufficient funds.' );
+      return;
+    }
+    updateCharacterFromAccount( sourceCharacter, createOptimizedAccount( currentBalance - price ) );
+    sendChat( Tbdr20.Announcer, spendingCharacter.get( Tbdr20.Objects.NAME ) + ' spent ' + price + ' gold. Thank you for banking with ' + Tbdr20.Announcer + '.' );
+  };
+
+  var doDirectAward = function( player, message, tokens )
+  {
+    if ( message.selected === undefined || message.selected.length == 0 ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Select token for character to receive award.' );
+      return;
+    }
+    const selectedTokenId = message.selected[ 0 ]._id;
+    const receivingCharacter = Tbdr20.characterObjectFromTokenId( selectedTokenId );
+    if ( receivingCharacter === undefined ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Selected token is not associated with a character.' );
+      return;
+    }
+    const receivingAccount = createCharacterAccount( receivingCharacter );
+    if ( tokens.length != 7 ) {
+      Tbdr20.whisperPlayer( player, 'Transaction failure. Direct award was not formatted correctly.' );
+      return;
+    }
+    const transaction = createCashAccount();
+    // Token sequence here is paired with cashTransactionInputs
+    transaction.pp = parseInt( tokens[ 2 ] );
+    transaction.gp = parseInt( tokens[ 3 ] );
+    transaction.ep = parseInt( tokens[ 4 ] );
+    transaction.sp = parseInt( tokens[ 5 ] );
+    transaction.cp = parseInt( tokens[ 6 ] );
+    const transactionMessage = coinCountMessage( transaction );
+    updateCharacterFromAccount( receivingCharacter, tellerTransact( transaction, receivingAccount ) );
+    const characterName = receivingCharacter.get( Tbdr20.Objects.NAME );
+    Tbdr20.whisperPlayer( player, 'Sent ' + transactionMessage + ' to ' + characterName + '.' );
+    const characterController = Tbdr20.firstController( selectedTokenId );
+    if ( characterController === undefined ) {
+      Tbdr20.whisperPlayer( player, 'Unable to notify player of award' );
+      return;
+    }
+    Tbdr20.whisperPlayer( player, characterName + ' received ' + transactionMessage + '.' );
   };
 
   // Distribute indicated cash evenly amongst rain accounts
@@ -165,15 +245,17 @@ var tbdBank = tbdBank || ( function()
       } else {
         // Sort trackers so account with smallest differential occurs first
         // Remaining coins will be given to characters who have received less
-        rainTrackers.sort( ( a, b ) => a.rainAccount.differential - b.rainAccount.differential );
         for ( var key in transaction ) {
+          rainTrackers.sort( ( a, b ) => a.rainAccount.differential - b.rainAccount.differential );
           var available = transaction[ key ];
           const remainder = available % rainTrackers.length;
           const fairShare = Math.floor( available / rainTrackers.length );
           rainTrackers.forEach(
             function( tracker, trackerIndex )
             {
-              tracker.cashAccount[ key ] += trackerIndex < remainder ? fairShare + 1 : fairShare;
+              const coinCount = trackerIndex < remainder ? fairShare + 1 : fairShare;
+              tracker.rainAccount.differential += goldValueFor( coinCount, key );
+              tracker.cashAccount[ key ] += coinCount;
             } );
         }
         var maximumDifferential = 0;
@@ -183,13 +265,12 @@ var tbdBank = tbdBank || ( function()
         rainTrackers.forEach(
           function( tracker )
           {
-            const goldEquivalent = valueInGold( tracker.cashAccount );
-            tracker.rainAccount.differential += goldEquivalent;
             maximumDifferential = Math.max( maximumDifferential, tracker.rainAccount.differential );
             updateCharacterFromAccount( 
               tracker.character, 
               tellerTransact( tracker.cashAccount, createCharacterAccount( tracker.character ) ) );
-Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' received ' + goldEquivalent + ' gp equivalent' );
+            const characterName = tracker.character.get( Tbdr20.Objects.NAME );
+            sendChat( Tbdr20.Announcer, characterName + ' received ' + coinCountMessage( tracker.cashAccount ) + '.' );
           } );
         // Drop differentials by maximum value so at least one account hits zero
         accounts.forEach( account => account.differential -= maximumDifferential );
@@ -200,6 +281,24 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
     }
   };
 
+  // Convert a number of coins to a gold value
+  var goldValueFor = function( coinCount, coinType )
+  {
+    if ( coinType == Tbdr20.Coins.PP ) {
+      return 10 * coinCount;
+    } else if ( coinType == Tbdr20.Coins.GP ) {
+      return coinCount;
+    } else if ( coinType == Tbdr20.Coins.EP ) {
+      return 0.5 * coinCount;
+    } else if ( coinType == Tbdr20.Coins.SP ) {
+      return 0.1 * coinCount;
+    } else if ( coinType == Tbdr20.Coins.CP ) {
+      return 0.01 * coinCount;
+    } else {
+      return 0;
+    }
+  };
+
   var doItemTransfer = function( player, tokens )
   {
     if ( tokens.length == 5 ) {
@@ -207,10 +306,20 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
       const destinationCharacter = getObj( Tbdr20.Objects.CHARACTER, tokens[ 3 ] );
       const itemAttributeCollection = Tbdr20.collectInventoryItemAttributeCollection( sourceCharacter, tokens[ 4 ] );
       if ( Tbdr20.collectionIsNotEmpty( itemAttributeCollection ) ) {
+        const nameAttribute = itemAttributeCollection[ Tbdr20.Inventory.NAME_SUFFIX ];
         Tbdr20.cleanAttributeCollection( itemAttributeCollection );
-        Tbdr20.copyCollectionToCharacter( destinationCharacter, itemAttributeCollection );
         Tbdr20.removeAttributes( itemAttributeCollection );
-        Tbdr20.whisperPlayer( player, 'Transfer successful. Thank you for banking with ' + Tbdr20.Announcer + '.' );
+        const copiedCollection = Tbdr20.copyCollectionToCharacter( destinationCharacter, itemAttributeCollection );
+//        Tbdr20.removeAttributes( itemAttributeCollection );
+        if ( nameAttribute !== undefined ) {
+          const itemName = nameAttribute.get( Tbdr20.Objects.CURRENT );
+          const destinationName = destinationCharacter.get( Tbdr20.Objects.NAME );
+          const actorName = destinationName == kBankCharacterName ? sourceCharacter.get( Tbdr20.Objects.NAME ) : destinationName;
+          const actionVerb = destinationName == kBankCharacterName ? 'deposited' : 'withdrew';
+          sendChat( Tbdr20.Announcer, actorName + ' ' + actionVerb + ' an item: ' + itemName + '. Thank you for banking with ' + Tbdr20.Announcer + '.' );
+        } else {
+          sendChat( Tbdr20.Announcer, 'Transfer was confusing. Item name was undefined.' );
+        }
       } else {
         Tbdr20.whisperPlayer( player, 'Item transfer failure. Item does not exist' );
       }
@@ -224,15 +333,20 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
   {
     const kMenuWidth = 220;
     const kButtonWidth = 200;
+    const withdrawAndSpendCall = Tbdr20.makeHrefApiCall( 
+      kBankCommand, 
+      [ Subcommands.WITHDRAW_AND_SPEND,
+        Tbdr20.makeTextInput( 'Spend gold equivalent', 0 ) ] )
     return Tbdr20.makeMenu( kMenuWidth,
       Tbdr20.makeHeader( 'Bank', kBankColor ) 
         + Tbdr20.makeSubHeader( 'Main Menu' )
         + Tbdr20.makeHorizontalSpacer( kBankColor )
         + Tbdr20.makeChatButton( TransactionKind.DEPOSIT, kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.DEPOSIT_MENU ] ), kButtonWidth )
         + Tbdr20.makeChatButton( TransactionKind.WITHDRAW, kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.WITHDRAW_MENU ] ), kButtonWidth )
+        + Tbdr20.makeChatButton( 'Withdraw & Spend', kBankColor, withdrawAndSpendCall, kButtonWidth )
         + Tbdr20.makeChatButton( 'Personal Balance', kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.SELF_BALANCE ] ), kButtonWidth )
         + Tbdr20.makeChatButton( 'Shared Balance', kBankColor, Tbdr20.makeHrefApiCall( kBankCommand, [ Subcommands.SHARED_BALANCE ] ), kButtonWidth )
-        + ( playerIsGM( player.id ) ? makeItRainMenu() : '' )
+        + ( playerIsGM( player.id ) ? gmMenu() : '' )
       );
   };
 
@@ -329,7 +443,10 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
   // Return a new account representing goldValue in fewest coins
   var createOptimizedAccount = function( goldValue )
   {
+    // Add half a copper piece to avoid float precision cutoff
+    const halfACopper = 0.005;
     const account = createCashAccount();
+    goldValue += halfACopper;
     account.pp = Math.floor( goldValue / 10 );
     goldValue = goldValue - 10 * account.pp;
     account.gp = Math.floor( goldValue );
@@ -378,6 +495,19 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
     return types;
   };
 
+  // Return a string describing the coin content of the account
+  var coinCountMessage = function( account )
+  {
+    const coinStrings = [];
+    for ( const key in account ) {
+      const coinCount = account[ key ];
+      if ( coinCount > 0 ) {
+        coinStrings.push( String( coinCount ) + ' ' + key );
+      }
+    }
+    return coinStrings.join( ', ' );
+  };
+
   // Create an account object holding coin values for the character
   var createCharacterAccount = function( character )
   {
@@ -406,7 +536,7 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
     }
   };
 
-  var makeItRainMenu = function()
+  var gmMenu = function()
   {
     const accounts = currentRainAccounts();
     const kButtonWidth = 200;
@@ -434,6 +564,13 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
         Tbdr20.makeHrefApiCall( 
           kBankCommand, 
           [ Subcommands.MAKE_IT_RAIN ].concat( cashTransactionInputs( createCashAccount(), 'Be Generous!' ) ) ), 
+        kButtonWidth ),
+      Tbdr20.makeChatButton( 
+        'Direct Award', 
+        kBankColor, 
+        Tbdr20.makeHrefApiCall( 
+          kBankCommand, 
+          [ Subcommands.DIRECT_AWARD ].concat( cashTransactionInputs( createCashAccount(), 'Be Generous!' ) ) ), 
         kButtonWidth )
       ].join( '' );
   };
@@ -496,7 +633,6 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
     state.tbdBank.rainAccounts = accounts.map( account => copyRainAccount( account ) );
   };
 
-
   var registerEventHandlers = function()
   {
     if ( Tbdr20 === undefined ) {
@@ -507,13 +643,7 @@ Tbdr20.whisperPlayer( player, tracker.character.get( Tbdr20.Objects.NAME ) + ' r
     }
 	};
 
-  var runTests = function()
-  {
-  };
-
-  return {
-    runTests: runTests,
-    registerEventHandlers: registerEventHandlers };
+  return { registerEventHandlers: registerEventHandlers };
 }() );
 
 on( "ready", function() { tbdBank.registerEventHandlers(); } );

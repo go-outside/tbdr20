@@ -498,6 +498,7 @@ var tbdCalendar = tbdCalendar || ( function()
         + '<br>' + current.weather 
         + makeDiv( arrowStyle, '' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcrest">Long Rest Finished</a>' )
+        + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddminute">Add a minute</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcadd10minutes">Add 10 minutes</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddhour">Add an hour</a>' )
         + makeDiv( tableStyle, '<a ' + anchorStyle2 + '" href="!fcaddday">Add a day</a>' )
@@ -631,6 +632,9 @@ var tbdCalendar = tbdCalendar || ( function()
           showCalendarInterface( message );
         } else if ( command === '!fcshare' ) {
           showCalendar( message );
+        } else if ( command === '!fcaddminute' ) {
+          addTime( 1 );
+          showCalendarInterface( message );
         } else if ( command === '!fcadd10minutes' ) {
           addTime( 10 );
           showCalendarInterface( message );

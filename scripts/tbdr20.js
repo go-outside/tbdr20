@@ -33,6 +33,7 @@ var Tbdr20 = Tbdr20 || ( function()
     _ONLINE : '_online',
     _PAGEID : '_pageid',
     _TYPE : '_type',
+    ALL : 'all',
     ATTRIBUTE : 'attribute',
     CAMPAIGN : 'campaign',
     CHARACTER : 'character',
@@ -96,13 +97,23 @@ var Tbdr20 = Tbdr20 || ( function()
   };
 
   /*
-  cleanForDeletion : function(equipAttr, attackAttr, resourceAttr, countAttr) {
-    equipAttr.setWithWorker({current: this.UNCHECKED});
-    attackAttr.setWithWorker({current: this.UNCHECKED});
-    resourceAttr.setWithWorker({current: this.UNCHECKED});
-    countAttr.setWithWorker({current: '0'});
-},
-  */
+  _equippedflag
+  _inventorysubflag
+  _itemattackid
+  _itemcount
+  _itemcontent
+  _itemdamage
+  _itemdamagetype
+  _itemmodifiers
+  _itemname
+  _itemproperties
+  _itemrange
+  _itemresourceid
+  _itemtype
+  _itemweight
+  _useasresource
+*/
+// {"name":"_reporder_repeating_inventory","current":"-Kv3z3p331JeXUJZpK2f,-Kv3z7HRZev8sZOjQQ3B,-K9PbDbhM3lAh6NYdRUI,-LZW9rcgw23uwW8eOA0X,-K9PcF4DcE5SG9Rv2vkN,-K9SRSBuELuLePqDnEni,-K9RWJu1arJ-nYBHMIZf,-K9SSH-pFfsSeAIraG69,-K9n2Z1oebTmaj5JZtqU,-KsWZItF-3NtjMtZtNoZ,-KsWZYGYZKPq8UQZbDvj,-KsWZbnqg6XmyOn6lYq5,-LRbfZIqNv5Fv53aWzCD,-KsWZoBYfzX4HNP-ZOq6,-KsWZtCZfM4Zy7ZXJyks,-KsWZy5VswEaS9NZwJUF,-KsZ8xkrDZADhqoWI6sX,-Kxdm8V6r0kOJRJhcHBd,-L9aExBgd0WlbUZTcBSc,-LI1SBvYq3kOyYc3u8xO,-LPLnTNH6m7T9QeE8TCo","max":"","_id":"-LRbfddpBrc-ZXUHD3aO","_type":"attribute","_characterid":"-K-9JySUkBoarmyzKCXO"}
 
   // Return attributes for the item in an object keyed by suffix
   // attributes may be undefined
@@ -135,19 +146,21 @@ var Tbdr20 = Tbdr20 || ( function()
     return false;
   };
 
-  // Create new attribute objects for the character
+  // Create new attribute objects for the character. Return the new attribute collection
   var copyCollectionToCharacter = function( character, attributeCollection )
   {
+    const newAttributes = {};
     for ( var key in attributeCollection ) {
       const attribute = attributeCollection[ key ];
       if ( attribute !== undefined ) {
-        createObj( Objects.ATTRIBUTE, {
+        newAttributes[ key ] = createObj( Objects.ATTRIBUTE, {
           characterid: character.id,
           name: attribute.get( Objects.NAME ),
           current: attribute.get( Objects.CURRENT ),
           max: attribute.get( Objects.MAX ) } );
       }
     }
+    return newAttributes;
   };
 
   // Call attribute.remove() on each defined attribute
@@ -177,13 +190,6 @@ var Tbdr20 = Tbdr20 || ( function()
     if ( useAsResource !== undefined ) {
       useAsResource.setWithWorker( { current: Inventory.UNCHECKED } );
     }
-    // This one does not make sense to use
-    /*
-    const count = attributeCollection[ Inventory.COUNT_SUFFIX ];
-    if ( count !== undefined ) {
-      count.setWithWorker( { current: Inventory.UNCHECKED } );
-    }
-    */
   };
 
   // Return an array of inventory items:
@@ -194,6 +200,7 @@ var Tbdr20 = Tbdr20 || ( function()
       .filter(
         function( object )
         {
+log( object );
           const nameProperty = object.get( Objects.NAME );
           return nameProperty.indexOf( Inventory.PREFIX ) !== -1 
             && nameProperty.indexOf( Inventory.NAME_SUFFIX ) !== -1;
@@ -233,6 +240,25 @@ var Tbdr20 = Tbdr20 || ( function()
     return findObjs( { _type: Objects.PLAYER, _online: true } )
       .map( entry => entry.get( Objects._ID ) )
       .find( id => playerIsGM( id ) );
+  };
+
+  // Return the first player object listed as controller of token
+  // Return undefined on failure
+  var firstController = function( tokenId )
+  {
+    const token = getObj( Objects.GRAPHIC, tokenId );
+    if ( token === undefined ) {
+      return undefined;
+    }
+    const character = getObj( Objects.CHARACTER, token.get( Verbs.REPRESENTS ) );
+    if ( character === undefined ) {
+      return undefined;
+    }
+    const controllers = character.get( Objects.CONTROLLEDBY ).split( ',' ).filter( item => item.length > 0 );
+    if ( controllers === undefined || controllers.length < 1 || controllers[ 0 ] == Objects.ALL ) {
+      return undefined;
+    }
+    return getObj( Objects.PLAYER, controllers[ 0 ] );
   };
 
   // Return the first character object with the given name
@@ -429,6 +455,8 @@ return this.generateUUID()().replace(/_/g, "Z");
     // enum
     Events: Events,
     // enum
+    Inventory: Inventory,
+    // enum
     Messages : Messages,
     // enum
     Objects : Objects,
@@ -452,6 +480,8 @@ return this.generateUUID()().replace(/_/g, "Z");
     extractApiTokens: extractApiTokens,
     // function( name )
     firstCharacterWithName: firstCharacterWithName,
+    // function( tokenId )
+    firstController : firstController,
     // function( text, backgroundColor, hrefString, width )
     makeChatButton: makeChatButton,
     // function( prompt, options )
