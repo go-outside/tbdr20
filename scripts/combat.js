@@ -35,6 +35,7 @@ var tbdCombat = tbdCombat || ( function()
     DISPLAY_NAME : 'displayname',
     GM_LAYER : 'gmlayer',
     GRAPHIC : 'graphic',
+    INITIATIVE_MODIFIER : 'initmod',
     LAYER : 'layer',
     MACRO : 'macro',
     NAME : 'name',
@@ -488,10 +489,13 @@ var tbdCombat = tbdCombat || ( function()
   // characterId is the .id property of a Roll20 'character' object
   var characterInitiative = function( characterId )
   {
-    const takeTen = 10;
     // Presume that getAttrByName may return undefined
-    var dexterity = getAttrByName( characterId, Roll20.AbilityScores.DEXTERITY );
-    return takeTen + ( dexterity === undefined ? 0 : abilityScoreModifier( Number( dexterity ) ) );
+    // {"name":"initmod","current":"5","max":""...
+    const rawInitiativeModifier = getAttrByName( characterId, Roll20.Objects.INITIATIVE_MODIFIER );
+    const initiativeModifier = rawInitiativeModifier === undefined ? 10 : parseInt( rawInitiativeModifier );
+    const dexterity = getAttrByName( characterId, Roll20.AbilityScores.DEXTERITY );
+    const dexterityModifier = dexterity === undefined ? 0 : abilityScoreModifier( Number( dexterity ) );
+    return 10 + initiativeModifier + dexterityModifier;
   };
 
   // Write a global message to the chat channel to indicate name has contracted condition
