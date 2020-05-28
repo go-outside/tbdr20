@@ -244,9 +244,10 @@ var Concentration = Concentration || (function() {
           message += '<b>'+character_name+'</b> is now concentrating on <b>'+spell_name+'</b>.';
 
           if ( tbdCombat !== undefined && tbdCombat.assignConcentration ) {
-            const rawDuration = msg.content.match( /{{duration=(.*?)}}/ );
+            //const rawDuration = msg.content.match( /{{duration=(.*?)}}/ );
+            const rawDuration = msg.content.match( /duration=(.+)/ );
             var duration = 10;
-            if ( rawDuration.length == 2 ) {
+            if ( rawDuration != null && rawDuration.length == 2 ) {
               const candidateDuration = extractDuration( rawDuration[ 1 ] );
               if ( candidateDuration > 0 ) {
                 duration = candidateDuration;
